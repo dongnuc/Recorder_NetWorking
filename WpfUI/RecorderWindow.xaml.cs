@@ -513,5 +513,10 @@ namespace WpfUI
         }
 
         #endregion
+
+        private void dgOutputClients_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+        {
+
+        }
     }
 }
