@@ -1009,7 +1009,7 @@ namespace WpfUI
 
         private void BtnDeleteOutputDB_Click(object sender, RoutedEventArgs e)
         {
-           
+
         }
     }
 }
