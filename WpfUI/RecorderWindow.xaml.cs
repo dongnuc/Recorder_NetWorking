@@ -1,4 +1,4 @@
-﻿using Common.Helper.Kernel32API;
+﻿﻿using Common.Helper.Kernel32API;
 using Common.Logging;
 using Common.Models.Entities;
 using Common.Resources;
@@ -154,7 +154,6 @@ namespace WpfUI
         private ChildProcess _serverChild;
         private IntPtr _serverMutex;
         private CancellationTokenSource _serverCts;
-
         private int _currentStageIndex = 0;
         private readonly string _testCaseName;
         private readonly string _clientPath;
@@ -163,6 +162,14 @@ namespace WpfUI
         // store NetwoekTransaction when middleware raised event
         private readonly Queue<NetworkTransaction> _pendingTransactions = new();
         private readonly object _transactionLock = new object();
+
+        private readonly IOFolderHandler _folderHandler;
+        private readonly IOFileHandler _fileHandler;
+        private readonly string _testCaseName;
+
+        private readonly string _baseTestCasesPath = @"D:\MyTestCases";
+
+        private string _currentTestCasePath; 
 
         #endregion
 
@@ -225,6 +232,17 @@ namespace WpfUI
                 var newStage = new TestStage();
                 TestStages[_currentStageIndex] = newStage;
                 return newStage;
+            }
+        }
+
+        private ObservableCollection<FileSystemItemViewModel> _rootItems = new ObservableCollection<FileSystemItemViewModel>();
+        public ObservableCollection<FileSystemItemViewModel> RootItems
+        {
+            get => _rootItems;
+            set
+            {
+                _rootItems = value;
+                OnPropertyChanged();
             }
         }
 
@@ -326,10 +344,6 @@ namespace WpfUI
 
         #region Initial Stage Creation
 
-        /// <summary>
-        /// Create Stage 1 with "START" action on startup
-        /// This captures initial connection data before user input
-        /// </summary>
         private void CreateInitialStage()
         {
             _currentStageIndex = 1;
@@ -387,9 +401,6 @@ namespace WpfUI
 
         #region Event Handlers - ProcessManager
 
-        /// <summary>
-        /// ✅ FIXED: Handle user input and create NEW STAGE
-        /// </summary>
         private void OnUserInput(string input, string dataType)
         {
             LogManager.Instance.LogDebug($"Data input{input}");
@@ -421,10 +432,6 @@ namespace WpfUI
             });
         }
 
-        /// <summary>
-        /// ✅ FIXED: Append to existing OutputClient or create new one for current stage
-        /// All output in same stage will be combined
-        /// </summary>
         private void OnClientOutput(string output)
         {
             LogManager.Instance.LogDebug($"Data output client {output}");
@@ -461,11 +468,6 @@ namespace WpfUI
 
             });
         }
-
-        /// <summary>
-        /// ✅ FIXED: Append to existing OutputServer or create new one for current stage
-        /// All output in same stage will be combined
-        /// </summary>
         private void OnServerOutput(string output)
         {
             LogManager.Instance.LogDebug($"Data output server {output}");
@@ -566,7 +568,6 @@ namespace WpfUI
         {
             Dispatcher.Invoke(() =>
             {
-                // ✅ V3.0: Tạo RECORD MỚI riêng cho middleware (KHÔNG tìm existing console output)
                 var outputServer = new OutputServer
                 {
                     Stage = _currentStageIndex,
@@ -574,11 +575,10 @@ namespace WpfUI
                     DataRequest = transaction.Request.Body,
                     DataTypeMiddleware = transaction.Request.DataType,
                     ByteSize = transaction.Request.ByteSize.ToString(),
-                    Output = null // Middleware record không có console output
+                    Output = null
                 };
                 CurrentTestStage.OutputServers.Add(outputServer);
 
-                // ✅ V3.0: Tạo RECORD MỚI riêng cho middleware (KHÔNG tìm existing console output)
                 var outputClient = new OutputClient
                 {
                     Stage = _currentStageIndex,
@@ -587,7 +587,7 @@ namespace WpfUI
                     DataResponse = transaction.Response.Body,
                     DataTypeMiddleWare = transaction.Response.DataType,
                     ByteSize = transaction.Response.ByteSize.ToString(),
-                    Output = null // Middleware record không có console output
+                    Output = null 
                 };
                 CurrentTestStage.OutputClients.Add(outputClient);
 
@@ -609,7 +609,6 @@ namespace WpfUI
                 return;
             }
 
-            // Prevent deleting stage 1 (initial connection stage)
             if (SelectedStageKey == 1)
             {
                 var confirmResult = MessageBox.Show(
@@ -630,7 +629,6 @@ namespace WpfUI
 
             if (result == MessageBoxResult.Yes)
             {
-                // Remove all data for this stage
                 CurrentTestStage.InputClients.Where(i => i.Stage == SelectedStageKey).ToList()
                     .ForEach(i => CurrentTestStage.InputClients.Remove(i));
 
@@ -655,7 +653,6 @@ namespace WpfUI
         {
             if (dgInputClients.SelectedItem is InputClient selectedItem)
             {
-                // Prevent deleting stage 1 initial input
                 if (selectedItem.Stage == 1 && selectedItem.Action == ActionKeywords.START)
                 {
                     var result = MessageBox.Show(
@@ -732,14 +729,222 @@ namespace WpfUI
             OnPropertyChanged(nameof(SelectedStageData));
         }
 
+        private void dgOutputClients_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+        {
+        }
+
+        #endregion
+
+
+        #region File/Folder Tree Logic
+
+        private void InitializeAndLoadTree()
+        {
+            try
+            {
+                _currentTestCasePath = _folderHandler.CreateDirectory(
+                    _baseTestCasesPath,
+                    _testCaseName
+                );
+
+                LoadFileTree();
+            }
+            catch (Exception ex)
+            {
+                LogManager.Instance.LogError($"Failed to initialize test case directory: {ex.Message}");
+                MessageBox.Show($"Failed to initialize test case directory: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void LoadFileTree()
+        {
+            RootItems.Clear();
+
+            try
+            {
+                var rootDirectoryInfo = new DirectoryInfo(_baseTestCasesPath);
+                var rootNode = new FileSystemItemViewModel
+                {
+                    Name = rootDirectoryInfo.Name,
+                    FullPath = rootDirectoryInfo.FullName,
+                    IsFolder = true
+                };
+
+                LoadSubFoldersAndFiles(rootNode);
+
+                RootItems.Add(rootNode);
+            }
+            catch (Exception ex)
+            {
+                LogManager.Instance.LogError($"Error loading file tree root: {ex.Message}");
+            }
+        }
+
+        private void LoadSubFoldersAndFiles(FileSystemItemViewModel parentNode)
+        {
+            try
+            {
+                foreach (var dir in Directory.GetDirectories(parentNode.FullPath))
+                {
+                    var dirInfo = new DirectoryInfo(dir);
+                    var childFolder = new FileSystemItemViewModel
+                    {
+                        Name = dirInfo.Name,
+                        FullPath = dirInfo.FullName,
+                        IsFolder = true
+                    };
+
+                    LoadSubFoldersAndFiles(childFolder);
+                    parentNode.Children.Add(childFolder);
+                }
+
+                foreach (var file in Directory.GetFiles(parentNode.FullPath))
+                {
+                    var fileInfo = new FileInfo(file);
+
+                    if (fileInfo.Extension.Equals(".xlsx", StringComparison.OrdinalIgnoreCase) ||
+                        fileInfo.Extension.Equals(".xls", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var childFile = new FileSystemItemViewModel
+                        {
+                            Name = fileInfo.Name,
+                            FullPath = fileInfo.FullName,
+                            IsFolder = false
+                        };
+                        parentNode.Children.Add(childFile);
+                    }
+                }
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // Bỏ qua các thư mục không có quyền truy cập
+            }
+            catch (Exception ex)
+            {
+                LogManager.Instance.LogWarning($"Could not access path: {parentNode.FullPath}. Error: {ex.Message}");
+            }
+        }
+
+        private void BtnRefreshTree_Click(object sender, RoutedEventArgs e)
+        {
+            LogManager.Instance.LogDebug("Refreshing file tree...");
+            LoadFileTree();
+        }
+
+        private void FileTree_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
+        {
+            if (FileTree.SelectedItem is FileSystemItemViewModel selectedItem && !selectedItem.IsFolder)
+            {
+                LogManager.Instance.LogInfomation($"File selected: {selectedItem.FullPath}");
+                LoadDataFromFile(selectedItem.FullPath);
+            }
+        }
+
+        
+        private async void BtnSaveCurrent_Click(object sender, RoutedEventArgs e)
+        {
+            if (!(FileTree.SelectedItem is FileSystemItemViewModel selectedItem) || selectedItem.IsFolder)
+            {
+                MessageBox.Show("Please select a file from the tree to save to.", "No File Selected", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            string targetPath = selectedItem.FullPath;
+
+            var confirm = MessageBox.Show($"This will overwrite the content of:\n{targetPath}\n\nAre you sure?", "Confirm Save", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+            if (confirm == MessageBoxResult.No)
+            {
+                return;
+            }
+
+            try
+            {
+                var excelConfig = new ConfigModel
+                {
+                    SaveLocation = targetPath,
+
+                };
+
+                _fileHandler.ConfigForWritingFile(excelConfig, "Excel");
+
+
+                LogManager.Instance.LogDebug($"Saving {CurrentTestStage.InputClients.Count} input rows to {targetPath}");
+                var inputBindingList = new BindingList<InputClient>(CurrentTestStage.InputClients.ToList());
+                await _fileHandler.WriteFileDataAsync(inputBindingList, 2, 1); 
+                LogManager.Instance.LogDebug($"Saving {CurrentTestStage.OutputClients.Count} output client rows to {targetPath}");
+                var outputClientBindingList = new BindingList<OutputClient>(CurrentTestStage.OutputClients.ToList());
+                await _fileHandler.WriteFileDataAsync(outputClientBindingList, 2, 1); 
+
+                LogManager.Instance.LogDebug($"Saving {CurrentTestStage.OutputServers.Count} output server rows to {targetPath}");
+                var outputServerBindingList = new BindingList<OutputServer>(CurrentTestStage.OutputServers.ToList());
+                await _fileHandler.WriteFileDataAsync(outputServerBindingList, 2, 1);
+
+                MessageBox.Show("Data saved successfully!", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+                LogManager.Instance.LogInfomation($"Data saved to {targetPath}");
+            }
+            catch (Exception ex)
+            {
+                LogManager.Instance.LogError($"Failed to save file: {ex.Message}");
+                MessageBox.Show($"Failed to save file: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void LoadDataFromFile(string filePath)
+        {
+            try
+            {
+                CurrentTestStage.InputClients.Clear();
+                CurrentTestStage.OutputClients.Clear();
+                CurrentTestStage.OutputServers.Clear();
+                StageKeys.Clear();
+
+                var inputs = _fileHandler.ReadFileData<InputClient>(filePath, "InputClients", 2, 1);
+                foreach (var item in inputs)
+                {
+                    CurrentTestStage.InputClients.Add(item); 
+                }
+
+                var outputsClient = _fileHandler.ReadFileData<OutputClient>(filePath, "OutputClients", 2, 1);
+                foreach (var item in outputsClient)
+                {
+                    CurrentTestStage.OutputClients.Add(item);
+                }
+
+                var outputsServer = _fileHandler.ReadFileData<OutputServer>(filePath, "OutputServers", 2, 1);
+                foreach (var item in outputsServer)
+                {
+                    CurrentTestStage.OutputServers.Add(item);
+                }
+
+                var allStages = inputs.Select(i => i.Stage)
+                                      .Distinct()
+                                      .OrderBy(s => s);
+                foreach (var stage in allStages)
+                {
+                    StageKeys.Add(stage);
+                }
+
+                if (StageKeys.Any())
+                {
+                    SelectedStageKey = StageKeys.First();
+                }
+
+                LogManager.Instance.LogInfomation($"Successfully loaded {inputs.Count} inputs from {filePath}");
+                OnPropertyChanged(nameof(SelectedStageData)); 
+            }
+            catch (Exception ex)
+            {
+                LogManager.Instance.LogError($"Failed to load file: {ex.Message}");
+                MessageBox.Show($"Failed to load file: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+
+                CreateInitialStage();
+            }
+        }
+
         #endregion
 
         #region Window Lifecycle
 
-        /// <summary>
-        /// Handle window closing event
-        /// Stop all processes and cleanup resources
-        /// </summary>
         protected override async void OnClosing(CancelEventArgs e)
         {
             var result = MessageBox.Show(
@@ -834,9 +1039,14 @@ namespace WpfUI
 
         public event PropertyChangedEventHandler PropertyChanged;
 
+
+
         protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
+
         {
+
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+
         }
 
         #endregion
