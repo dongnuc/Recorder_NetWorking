@@ -1,10 +1,16 @@
-﻿// UITestKit/MainWindow.xaml.cs
+﻿// --- CÁC USING CŨ CỦA BẠN ---
 using Common.Helper;
+// --- CÁC USING MỚI ĐÃ SỬA ĐÚNG THEO HÌNH ẢNH CỦA BẠN ---
+using Common.Interfaces.IOFile;      // Interface
 using Common.Logging;
+using FileManagement.FileHelper.FileHandler;    // Class triển khai ExcelExecution
+using FileManagement.FolderHelper;   // Class triển khai FolderHandler
 using Microsoft.Win32;
 using Middleware.Services;
 using ProcessManagement.Services;
+using System;
 using System.IO;
+using System.Threading.Tasks;
 using System.Windows;
 
 namespace WpfUI
@@ -97,12 +103,26 @@ namespace WpfUI
                 await MiddlewareStart.Instance.StartAsync(proxyPort, serverPort, useHttp);
                 LogManager.Instance.LogInfomation($"✅ Middleware started - Protocol: {(useHttp ? "HTTP" : "TCP")}");
 
+                // --- BẮT ĐẦU SỬA ĐỔI ---
+
                 // Create ProcessManager
                 var processManager = new ProcessManager();
 
-                // Create RecorderWindow
+                // 2. TẠO CÁC HANDLER CỦA BẠN (ĐÃ SỬA ĐÚNG THEO HÌNH ẢNH)
+                IOFolderHandler folderHandler = new FolderHandler();
+                IOFileHandler fileHandler = new ExcelExecution(); // <<< ĐÃ SỬA TỪ ExcelFileHandler THÀNH ExcelExecution
+
+                // Create RecorderWindow (VỚI CONSTRUCTOR MỚI)
                 TxtStatus.Text = "🎙️ Opening recorder...";
-                var recorderWindow = new RecorderWindow(testCaseName, processManager);
+                var recorderWindow = new RecorderWindow(
+                    testCaseName,
+                    processManager,
+                    folderHandler,   // <--- Tiêm vào
+                    fileHandler      // <--- Tiêm vào
+                );
+
+                // --- KẾT THÚC SỬA ĐỔI ---
+
                 recorderWindow.Title = $"Recording: {testCaseName}";
                 recorderWindow.Show();
 
