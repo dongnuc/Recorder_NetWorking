@@ -81,18 +81,21 @@ namespace FileManagement.FolderHelper
 
         public void CopyTemplateFromResource(string path, string srcDirectory, bool overwrite = true, params string[] specialFiles)
         {
+
             foreach (var fileName in specialFiles)
             {
                 string srcPath = Path.Combine(srcDirectory, fileName);
+                string targetPath = Path.Combine(path, fileName);
 
-                IEnumerable<string> targetPaths = File.Exists(path)
-                    ? new[] { path }
-                    : Directory.GetFiles(path, fileName, SearchOption.AllDirectories);
-
-                foreach (var targetPath in targetPaths)
+                if (!File.Exists(srcPath))
                 {
-                    Copy(srcPath, targetPath, overwrite);
+                    throw new FileNotFoundException(
+                        $"Template file not found: {srcPath}. \n\n" +
+                        $"Please make sure the file '{fileName}' exists in '{srcDirectory}' " +
+                        "and its 'Copy to Output Directory' property is set to 'Copy if newer'.",
+                        srcPath);
                 }
+                Copy(srcPath, targetPath, overwrite);
             }
         }
 
@@ -110,19 +113,13 @@ namespace FileManagement.FolderHelper
         {
             if (File.Exists(sourcePath))
             {
-                if (File.Exists(destinationPath))
+                string targetFilePath = destinationPath;
+
+                if (Directory.Exists(destinationPath))
                 {
-                    File.Copy(sourcePath, destinationPath, overwrite);
+                    targetFilePath = Path.Combine(destinationPath, Path.GetFileName(sourcePath));
                 }
-                else if (Directory.Exists(destinationPath))
-                {
-                    string destinationFilePath = Path.Combine(destinationPath, Path.GetFileName(sourcePath));
-                    File.Copy(sourcePath, destinationFilePath, overwrite);
-                }
-                else
-                {
-                    throw new FileNotFoundException("The destination path does not exist or is invalid.");
-                }
+                File.Copy(sourcePath, targetFilePath, overwrite);
             }
             else if (Directory.Exists(sourcePath))
             {
@@ -130,28 +127,26 @@ namespace FileManagement.FolderHelper
                 {
                     Directory.CreateDirectory(destinationPath);
                 }
-                CopyDirectory(new DirectoryInfo(sourcePath), new DirectoryInfo(destinationPath));
+
+                CopyDirectory(new DirectoryInfo(sourcePath), new DirectoryInfo(destinationPath), overwrite);
+            }
+            else
+            {
+                throw new FileNotFoundException("Source file or directory not found.", sourcePath);
             }
         }
 
-        private void CopyDirectory(DirectoryInfo source, DirectoryInfo destination)
+        private void CopyDirectory(DirectoryInfo source, DirectoryInfo target, bool overwrite)
         {
-            if (!destination.Exists)
+            foreach (DirectoryInfo dir in source.GetDirectories())
             {
-                destination.Create();
+                CopyDirectory(dir, target.CreateSubdirectory(dir.Name), overwrite);
             }
 
-            FileInfo[] files = source.GetFiles();
-            foreach (FileInfo file in files)
+            foreach (FileInfo file in source.GetFiles())
             {
-                file.CopyTo(Path.Combine(destination.FullName, file.Name), true);
-            }
-
-            DirectoryInfo[] dirs = source.GetDirectories();
-            foreach (DirectoryInfo dir in dirs)
-            {
-                string destinationDir = Path.Combine(destination.FullName, dir.Name);
-                CopyDirectory(dir, new DirectoryInfo(destinationDir));
+                string targetFilePath = Path.Combine(target.FullName, file.Name);
+                file.CopyTo(targetFilePath, overwrite);
             }
         }
 

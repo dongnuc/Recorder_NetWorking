@@ -15,4 +15,16 @@
     <ProjectReference Include="..\ProcessManagement\ProcessManagement.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="Resources\Templates\detail.xlsx">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Resources\Templates\environment.xlsx">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Resources\Templates\header.xlsx">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

@@ -2,6 +2,7 @@
 using Common.Models.Entities;
 using OfficeOpenXml;
 using OfficeOpenXml.Style;
+using LisenceContext = OfficeOpenXml.LicenseContext;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -19,7 +20,7 @@ namespace FileManagement.FileHelper.FileHandler
 
         public ExcelExecution()
         {
-            ExcelPackage.LicenseContext = OfficeOpenXml.LicenseContext.NonCommercial;
+            ExcelPackage.LicenseContext = LisenceContext.NonCommercial; 
         }
 
         public void ConfigForWritingFile<TConfig>(TConfig config, string type)
