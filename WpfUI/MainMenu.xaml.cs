@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Windows;
+using System.Windows.Controls; 
+using System.Windows.Media;    
 using WpfUI.ViewModels;
 
 namespace WpfUI
@@ -22,11 +24,18 @@ namespace WpfUI
             {
                 if (_viewModel != null) _viewModel.SelectedItem = selectedItem;
 
-                var textBlock = MainContentArea.Content as System.Windows.Controls.TextBlock;
-                if (textBlock != null)
+                var fileDetailTextBlock = new TextBlock
                 {
-                    textBlock.Text = $"Đã chọn file: {selectedItem.Name}\nĐường dẫn: {selectedItem.FullPath}";
-                }
+                    Text = $"Đã chọn file: {selectedItem.Name}\nĐường dẫn: {selectedItem.FullPath}",
+                    FontSize = 16,
+                    HorizontalAlignment = HorizontalAlignment.Left,
+                    VerticalAlignment = VerticalAlignment.Top,
+                    TextWrapping = TextWrapping.Wrap,
+                    Foreground = Brushes.Black, 
+                    Margin = new Thickness(10)
+                };
+
+                MainContentArea.Content = fileDetailTextBlock;
             }
         }
 

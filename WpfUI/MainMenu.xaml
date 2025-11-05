@@ -19,6 +19,15 @@
             </MenuItem>
         </Menu>
 
+        <ToolBarTray DockPanel.Dock="Top" Background="WhiteSmoke">
+            <ToolBar>
+                <Button Content="&#xE72B;" FontFamily="Segoe MDL2 Assets" ToolTip="Back" FontSize="16" Padding="5" VerticalAlignment="Center"/>
+                <Button Content="&#xE72A;" FontFamily="Segoe MDL2 Assets" ToolTip="Forward" FontSize="16" Padding="5" VerticalAlignment="Center"/>
+                <Separator/>
+                <Button Content="&#xE80F;" FontFamily="Segoe MDL2 Assets" ToolTip="Home" FontSize="16" Padding="5" VerticalAlignment="Center"/>
+            </ToolBar>
+        </ToolBarTray>
+
         <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="300" MinWidth="250"/>
@@ -54,9 +63,15 @@
 
             <Grid Grid.Column="2">
                 <ContentControl x:Name="MainContentArea" Margin="5">
-                    <TextBlock Text="Chào mừng! Vui lòng chọn một file từ cây bên trái."
-                               FontSize="18" HorizontalAlignment="Center" VerticalAlignment="Center"
-                               TextWrapping="Wrap" Foreground="Gray"/>
+                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <TextBlock Text="Chào mừng! Vui lòng chọn một file từ cây bên trái."
+                                   FontSize="18" HorizontalAlignment="Center"
+                                   TextWrapping="Wrap" Foreground="Gray"/>
+                        <TextBlock Text="Đây là khu vực StackPanel tạm thời."
+                                   FontSize="14" HorizontalAlignment="Center"
+                                   TextWrapping="Wrap" Foreground="DarkGray" Margin="0,10,0,0"/>
+                  
+                    </StackPanel>
                 </ContentControl>
             </Grid>
         </Grid>
