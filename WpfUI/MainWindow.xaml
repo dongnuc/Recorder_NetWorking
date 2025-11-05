@@ -17,7 +17,6 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <!-- Title -->
         <TextBlock Grid.Row="0" 
                    Text="🎙️ Test Case Recorder Setup"
                    FontSize="24"
@@ -25,7 +24,6 @@
                    Foreground="#2C3E50"
                    Margin="0,0,0,20"/>
 
-        <!-- Client EXE Path -->
         <GroupBox Grid.Row="1" Header="Client Executable" Margin="0,0,0,10">
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -52,7 +50,6 @@
             </Grid>
         </GroupBox>
 
-        <!-- Server EXE Path -->
         <GroupBox Grid.Row="2" Header="Server Executable" Margin="0,0,0,10">
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -79,7 +76,6 @@
             </Grid>
         </GroupBox>
 
-        <!-- Test Case Name -->
         <GroupBox Grid.Row="3" Header="Test Case Name" Margin="0,0,0,10">
             <TextBox x:Name="TxtTestCaseName" 
                      Height="30"
@@ -88,7 +84,6 @@
                      ToolTip="Enter test case name"/>
         </GroupBox>
 
-        <!-- Protocol Selection -->
         <GroupBox Grid.Row="4" Header="Protocol" Margin="0,0,0,10">
             <StackPanel Orientation="Horizontal">
                 <RadioButton x:Name="RbHttp" 
@@ -102,7 +97,6 @@
             </StackPanel>
         </GroupBox>
 
-        <!-- Status Info -->
         <Border Grid.Row="5" 
                 Background="#34495E" 
                 Padding="10"
@@ -121,7 +115,6 @@
             </StackPanel>
         </Border>
 
-        <!-- Start Button -->
         <Button Grid.Row="6"
                 x:Name="BtnStartRecording"
                 Content="🎙️ Start Recording"

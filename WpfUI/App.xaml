@@ -2,16 +2,13 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="clr-namespace:WpfUI"
-             
              xmlns:converters="clr-namespace:WpfUI.Converters"
-             
-             StartupUri="MainWindow.xaml">
+             StartupUri="ProjectSetupWindow.xaml"
+             >
 
     <Application.Resources>
         <ResourceDictionary>
-
             <converters:FolderToIconConverter x:Key="FolderToIconConverter" />
-
         </ResourceDictionary>
     </Application.Resources>
 </Application>

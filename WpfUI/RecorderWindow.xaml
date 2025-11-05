@@ -4,9 +4,6 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:WpfUI"
-        
-        xmlns:vm="clr-namespace:WpfUI.ViewModels"
-        
         mc:Ignorable="d"
         Title="RecorderWindow" Height="450" Width="800">
     <DockPanel>
@@ -77,30 +74,88 @@
             </TextBlock>
         </StackPanel>
 
-            <ColumnDefinition Width="*"/>
-        </Grid.ColumnDefinitions>
+        <Grid Margin="5">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="5"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
 
-        <Grid Grid.Column="0">
-            <GroupBox Header="📁 Test Case Explorer" Margin="5" FontWeight="Bold">
-                <TreeView x:Name="FileTree" 
-                          ItemsSource="{Binding RootItems}"
-                          SelectedItemChanged="FileTree_SelectedItemChanged"
-                          Margin="5">
+            <GroupBox Grid.Row="0" Header="Input Client" Margin="0,0,0,5">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
 
-                    <TreeView.Resources>
-                        <HierarchicalDataTemplate 
-                            DataType="{x:Type vm:FileSystemItemViewModel}" 
-                            ItemsSource="{Binding Children}">
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="5" HorizontalAlignment="Right">
+                        <Button Content="🗑️ Delete Selected" 
+                                Click="BtnDeleteInputClient_Click"
+                                Background="#E67E22" 
+                                Foreground="White"
+                                BorderThickness="0" 
+                                Cursor="Hand"
+                                Padding="8,4"
+                                ToolTip="Delete selected input client row"/>
+                    </StackPanel>
 
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="{Binding IsFolder, Converter={StaticResource FolderToIconConverter}}" 
-                                           FontFamily="Segoe MDL2 Assets" 
-                                           VerticalAlignment="Center" 
-                                           Margin="0,0,5,0"
-                                           FontSize="14"/>
-                                <TextBlock Text="{Binding Name}" VerticalAlignment="Center"/>
+                    <DataGrid Grid.Row="1"
+                              x:Name="dgInputClients"
+                              ItemsSource="{Binding SelectedStageData.InputClients, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                              AutoGenerateColumns="False"
+                              CanUserAddRows="True"
+                              CanUserDeleteRows="True"
+                              SelectionMode="Single">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Stage" 
+                                                Binding="{Binding Stage, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" 
+                                                Width="70" 
+                                                IsReadOnly="False"/>
+                            <DataGridTextColumn Header="Action" 
+                                                Binding="{Binding Action, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" 
+                                                Width="120" 
+                                                IsReadOnly="False"/>
+                            <DataGridTextColumn Header="Input" 
+                                                Binding="{Binding Input, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" 
+                                                Width="*" 
+                                                IsReadOnly="False"/>
+                            <DataGridTextColumn Header="DataType" 
+                                                Binding="{Binding DataType, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" 
+                                                Width="150" 
+                                                IsReadOnly="False"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </GroupBox>
+
+            <GridSplitter Grid.Row="1" 
+                          Height="5" 
+                          HorizontalAlignment="Stretch" 
+                          VerticalAlignment="Center"
+                          Background="LightGray"
+                          ShowsPreview="True"/>
+
+            <GroupBox Grid.Row="2" Header="Outputs" Margin="0,5,0,0">
+                <TabControl>
+                    <TabItem Header="Output Client">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="5" HorizontalAlignment="Right">
+                                <Button Content="🗑️ Delete Selected" 
+                                        Click="BtnDeleteOutputClient_Click"
+                                        Background="#E67E22" 
+                                        Foreground="White"
+                                        BorderThickness="0" 
+                                        Cursor="Hand"
+                                        Padding="8,4"
+                                        ToolTip="Delete selected output client row"/>
                             </StackPanel>
 
+<<<<<<< HEAD
 <<<<<<< HEAD
                             <DataGrid Grid.Row="1"
                                   x:Name="dgOutputClients"
@@ -110,6 +165,16 @@
                                   CanUserAddRows="False"
                                   CanUserDeleteRows="True"
                                   SelectionMode="Single">
+=======
+                            <DataGrid Grid.Row="1"
+                                      x:Name="dgOutputClients"
+                                      ItemsSource="{Binding SelectedStageData.OutputClients, Mode=TwoWay}"
+                                      IsReadOnly="False"
+                                      AutoGenerateColumns="False"
+                                      CanUserAddRows="False"
+                                      CanUserDeleteRows="True"
+                                      SelectionMode="Single">
+>>>>>>> ebc8293 (update viewtree wpf)
                                 <DataGrid.Columns>
                                     <DataGridTextColumn Header="Stage" Binding="{Binding Stage}" Width="60"/>
                                     <DataGridTextColumn Header="Method" Binding="{Binding Method}" Width="80"/>
@@ -129,7 +194,10 @@
                         </Grid>
                     </TabItem>
 
+<<<<<<< HEAD
                     <!-- Output Server Tab -->
+=======
+>>>>>>> ebc8293 (update viewtree wpf)
                     <TabItem Header="Output Server">
                         <Grid>
                             <Grid.RowDefinitions>
@@ -137,6 +205,7 @@
                                 <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
 
+<<<<<<< HEAD
                             <!-- Delete Button for Output Server -->
                             <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="5" HorizontalAlignment="Right">
                                 <Button Content="🗑️ Delete Selected" 
@@ -157,6 +226,27 @@
                                   CanUserAddRows="False"
                                   CanUserDeleteRows="True"
                                   SelectionMode="Single">
+=======
+                            <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="5" HorizontalAlignment="Right">
+                                <Button Content="🗑️ Delete Selected" 
+                                        Click="BtnDeleteOutputServer_Click"
+                                        Background="#E67E22" 
+                                        Foreground="White"
+                                        BorderThickness="0" 
+                                        Cursor="Hand"
+                                        Padding="8,4"
+                                        ToolTip="Delete selected output server row"/>
+                            </StackPanel>
+
+                            <DataGrid Grid.Row="1"
+                                      x:Name="dgOutputServers"
+                                      ItemsSource="{Binding SelectedStageData.OutputServers, Mode=TwoWay}"
+                                      IsReadOnly="False"
+                                      AutoGenerateColumns="False"
+                                      CanUserAddRows="False"
+                                      CanUserDeleteRows="True"
+                                      SelectionMode="Single">
+>>>>>>> ebc8293 (update viewtree wpf)
                                 <DataGrid.Columns>
                                     <DataGridTextColumn Header="Stage" Binding="{Binding Stage}" Width="60"/>
                                     <DataGridTextColumn Header="Method" Binding="{Binding Method}" Width="80"/>
@@ -174,6 +264,7 @@
                             </DataGrid>
                         </Grid>
                     </TabItem>
+<<<<<<< HEAD
 
                     <!-- Output DB Tab - NEW -->
                     <TabItem Header="Output DB">
@@ -447,4 +538,10 @@
 
     </Grid>
 >>>>>>> dc406f3 (Add wpf viewtree)
+=======
+                </TabControl>
+            </GroupBox>
+        </Grid>
+    </DockPanel>
+>>>>>>> ebc8293 (update viewtree wpf)
 </Window>
