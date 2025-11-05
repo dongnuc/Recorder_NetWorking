@@ -19,8 +19,6 @@ namespace Common.Helper.Kernel32API
         [DllImport("kernel32.dll")]
         static extern uint GetLastError();
 
-        const uint INFINITE = 0xFFFFFFFF;
-
         public IntPtr Create(string mutexName)
         {
             IntPtr mutex = CreateMutex(IntPtr.Zero, false, mutexName);
@@ -33,7 +31,7 @@ namespace Common.Helper.Kernel32API
 
         public void Wait(IntPtr mutex)
         {
-            WaitForSingleObject(mutex, INFINITE);
+            WaitForSingleObject(mutex, Constants.INFINITE);
         }
 
         public void Release(IntPtr mutex)

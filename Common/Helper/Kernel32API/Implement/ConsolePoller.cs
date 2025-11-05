@@ -1,4 +1,5 @@
-﻿using System.Runtime.InteropServices;
+﻿using Common.Logging;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace Common.Helper.Kernel32API
@@ -29,106 +30,22 @@ namespace Common.Helper.Kernel32API
         [DllImport("kernel32.dll", SetLastError = true)]
         static extern bool ReleaseMutex(IntPtr hMutex);
 
-        const int STD_OUTPUT_HANDLE = -11;
-        const uint INFINITE = 0xFFFFFFFF;
-        const uint WAIT_TIMEOUT = 0x102;
-
-        private readonly Dictionary<uint, string> _previousBuffers = new Dictionary<uint, string>();
         private readonly Dictionary<uint, bool> _firstPolls = new Dictionary<uint, bool>();
 
-        public async Task<string> PollAsync(ChildProcess child, IntPtr mutex)
+        public async Task<string> CaptureCurrentConsoleAsync(
+           ChildProcess child,
+           IntPtr mutex,
+           bool expandBuffer = true)
         {
-            StringBuilder logBuilder = new StringBuilder();
-            string previousBuffer = "";
-            bool first = true;
-            while (WaitForSingleObject(child.hProcess, 0) != 0x80)
+            if (child == null || child.hProcess == IntPtr.Zero)
             {
-                WaitForSingleObject(mutex, INFINITE);
-                bool attached = false;
-                for (int attempt = 0; attempt < 5; attempt++)
-                {
-                    if (AttachConsole(child.processId))
-                    {
-                        attached = true;
-                        break;
-                    }
-                    await Task.Delay(50);
-                }
-                if (!attached)
-                {
-                    ReleaseMutex(mutex);
-                    await Task.Delay(100);
-                    continue;
-                }
-                IntPtr hOut = GetStdHandle(STD_OUTPUT_HANDLE);
-                if (hOut != (IntPtr)(-1))
-                {
-                    CONSOLE_SCREEN_BUFFER_INFO info;
-                    if (GetConsoleScreenBufferInfo(hOut, out info))
-                    {
-                        if (first)
-                        {
-                            COORD newSize = info.dwSize;
-                            newSize.Y = 9999;
-                            SetConsoleScreenBufferSize(hOut, newSize);
-                            first = false;
-                            GetConsoleScreenBufferInfo(hOut, out info);
-                        }
-                        uint length = (uint)(info.dwSize.X * info.dwSize.Y);
-                        StringBuilder sb = new StringBuilder((int)length);
-                        uint read;
-                        COORD coord = new COORD { X = 0, Y = 0 };
-                        if (ReadConsoleOutputCharacter(hOut, sb, length, coord, out read))
-                        {
-                            string currentBuffer = sb.ToString(0, (int)read).TrimEnd('\0');
-                            List<string> currentLines = new List<string>();
-                            for (short y = 0; y <= info.dwCursorPosition.Y; y++)
-                            {
-                                int start = y * info.dwSize.X;
-                                if (start + info.dwSize.X > currentBuffer.Length) break;
-                                string line = currentBuffer.Substring(start, Math.Min(info.dwSize.X, currentBuffer.Length - start)).TrimEnd();
-                                if (!string.IsNullOrEmpty(line))
-                                    currentLines.Add(line);
-                            }
-                            string processedCurrent = string.Join(Environment.NewLine, currentLines);
-                            if (processedCurrent.Length > previousBuffer.Length && processedCurrent.StartsWith(previousBuffer))
-                            {
-                                string newText = processedCurrent.Substring(previousBuffer.Length);
-                                if (!string.IsNullOrEmpty(newText))
-                                {
-                                    logBuilder.Append(newText);
-                                }
-                            }
-                            else if (processedCurrent != previousBuffer)
-                            {
-                                logBuilder.Append(processedCurrent);
-                            }
-                            previousBuffer = processedCurrent;
-                        }
-                    }
-                }
-                FreeConsole();
-                ReleaseMutex(mutex);
-                await Task.Delay(100);
+                throw new ArgumentException("Invalid child process handle");
             }
-            return logBuilder.ToString();
-        }
 
-        /// <summary>
-        /// ✅ NEW: Poll console buffer ONCE and return new output immediately (non-blocking)
-        /// This is for continuous real-time monitoring
-        /// </summary>
-        public async Task<string> PollOnceAsync(ChildProcess child, IntPtr mutex)
-        {
-            // Check if process is still alive
-            uint waitResult = WaitForSingleObject(child.hProcess, 0);
-            if (waitResult == 0x80) // Process terminated
-            {
-                return string.Empty;
-            }
+            LogManager.Instance.LogDebug($"📸 Capturing console snapshot for process PID: {child.processId}");
 
             // Wait for mutex
-            WaitForSingleObject(mutex, INFINITE);
+            WaitForSingleObject(mutex, Constants.INFINITE);
 
             try
             {
@@ -146,10 +63,11 @@ namespace Common.Helper.Kernel32API
 
                 if (!attached)
                 {
+                    LogManager.Instance.LogWarning($"⚠️ Could not attach to console for process {child.processId}");
                     return string.Empty;
                 }
 
-                IntPtr hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+                IntPtr hOut = GetStdHandle(Constants.STD_OUTPUT_HANDLE);
                 if (hOut == (IntPtr)(-1))
                 {
                     FreeConsole();
@@ -163,24 +81,21 @@ namespace Common.Helper.Kernel32API
                     return string.Empty;
                 }
 
-                // Initialize buffer tracking for this process
-                if (!_firstPolls.ContainsKey(child.processId))
-                {
-                    _firstPolls[child.processId] = true;
-                    _previousBuffers[child.processId] = string.Empty;
-                }
-
-                // On first poll, expand buffer size
-                if (_firstPolls[child.processId])
+                // ✅ Expand buffer size if requested (first time only)
+                if (expandBuffer && !_firstPolls.ContainsKey(child.processId))
                 {
                     COORD newSize = info.dwSize;
                     newSize.Y = 9999;
                     SetConsoleScreenBufferSize(hOut, newSize);
-                    _firstPolls[child.processId] = false;
+                    _firstPolls[child.processId] = true;
+
+                    // Re-read buffer info after expansion
                     GetConsoleScreenBufferInfo(hOut, out info);
+
+                    LogManager.Instance.LogDebug($"✅ Buffer expanded for process {child.processId}");
                 }
 
-                // Read console buffer
+                // ✅ Read entire console buffer
                 uint length = (uint)(info.dwSize.X * info.dwSize.Y);
                 StringBuilder sb = new StringBuilder((int)length);
                 uint read;
@@ -189,47 +104,39 @@ namespace Common.Helper.Kernel32API
                 if (!ReadConsoleOutputCharacter(hOut, sb, length, coord, out read))
                 {
                     FreeConsole();
+                    LogManager.Instance.LogWarning($"⚠️ Failed to read console buffer for process {child.processId}");
                     return string.Empty;
                 }
 
-                // Extract visible lines up to cursor position
+                // ✅ Extract visible lines up to cursor position
                 string currentBuffer = sb.ToString(0, (int)read).TrimEnd('\0');
-                List<string> currentLines = new List<string>();
+                List<string> lines = new List<string>();
 
                 for (short y = 0; y <= info.dwCursorPosition.Y; y++)
                 {
                     int start = y * info.dwSize.X;
-                    if (start + info.dwSize.X > currentBuffer.Length) break;
-                    string line = currentBuffer.Substring(start, Math.Min(info.dwSize.X, currentBuffer.Length - start)).TrimEnd();
+                    if (start >= currentBuffer.Length) break;
+
+                    int lineLength = Math.Min(info.dwSize.X, currentBuffer.Length - start);
+                    string line = currentBuffer.Substring(start, lineLength).TrimEnd();
+
                     if (!string.IsNullOrEmpty(line))
-                        currentLines.Add(line);
+                    {
+                        lines.Add(line);
+                    }
                 }
 
-                string processedCurrent = string.Join(Environment.NewLine, currentLines);
-
-                // Get previous buffer for this process
-                string previousBuffer = _previousBuffers[child.processId];
-                string newOutput = string.Empty;
-
-                // Detect new output
-                if (processedCurrent.Length > previousBuffer.Length && processedCurrent.StartsWith(previousBuffer))
-                {
-                    newOutput = processedCurrent.Substring(previousBuffer.Length);
-                }
-                else if (processedCurrent != previousBuffer)
-                {
-                    newOutput = processedCurrent; // Full buffer changed
-                }
-
-                // Update previous buffer
-                _previousBuffers[child.processId] = processedCurrent;
+                string result = string.Join(Environment.NewLine, lines);
 
                 FreeConsole();
 
-                return newOutput;
+                LogManager.Instance.LogInfomation($"✅ Captured {lines.Count} lines, {result.Length} characters from process {child.processId}");
+
+                return result;
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                LogManager.Instance.LogError($"❌ Error capturing console for process {child.processId}: {ex.Message}");
                 try { FreeConsole(); } catch { }
                 return string.Empty;
             }
@@ -237,6 +144,51 @@ namespace Common.Helper.Kernel32API
             {
                 ReleaseMutex(mutex);
             }
+        }
+
+        /// <summary>
+        /// ✅ SIMPLER VERSION: Capture với retry logic
+        /// Tự động retry nếu capture thất bại
+        /// </summary>
+        public async Task<string> CaptureCurrentConsoleWithRetryAsync(
+            ChildProcess child,
+            IntPtr mutex,
+            int maxRetries = 3,
+            int retryDelayMs = 200,
+            bool expandBuffer = true)
+        {
+            for (int attempt = 1; attempt <= maxRetries; attempt++)
+            {
+                try
+                {
+                    string result = await CaptureCurrentConsoleAsync(child, mutex, expandBuffer);
+
+                    if (!string.IsNullOrEmpty(result))
+                    {
+                        return result;
+                    }
+
+                    if (attempt < maxRetries)
+                    {
+                        LogManager.Instance.LogDebug($"⏳ Retry {attempt}/{maxRetries} for process {child.processId}");
+                        await Task.Delay(retryDelayMs);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    LogManager.Instance.LogError($"❌ Attempt {attempt} failed: {ex.Message}");
+
+                    if (attempt >= maxRetries)
+                    {
+                        throw;
+                    }
+
+                    await Task.Delay(retryDelayMs);
+                }
+            }
+
+            LogManager.Instance.LogWarning($"⚠️ All {maxRetries} attempts failed for process {child.processId}");
+            return string.Empty;
         }
     }
 }

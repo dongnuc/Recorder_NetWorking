@@ -153,14 +153,14 @@ namespace Common.Logging
 
         private void WriteToFile(string line)
         {
-            try
-            {
-                File.AppendAllText(_logFilePath, line + Environment.NewLine);
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[LogManager] File write error: {ex.Message}");
-            }
+            //try
+            //{
+            //    File.AppendAllText(_logFilePath, line + Environment.NewLine);
+            //}
+            //catch (Exception ex)
+            //{
+            //    Debug.WriteLine($"[LogManager] File write error: {ex.Message}");
+            //}
         }
 
 #endregion

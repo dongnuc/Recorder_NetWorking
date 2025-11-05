@@ -7,6 +7,8 @@ namespace Common.Models.Entities
         public ObservableCollection<InputClient> InputClients { get; set; } = new();
         public ObservableCollection<OutputClient> OutputClients { get; set; } = new();
         public ObservableCollection<OutputServer> OutputServers { get; set; } = new();
+        public ObservableCollection<OutputDB> OutputDBs { get; set; } = new();
+
     }
 
 }

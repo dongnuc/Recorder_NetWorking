@@ -1,24 +1,15 @@
-﻿// ProcessManagement/Services/ProcessManager.cs
-using System;
-using System.Collections.Concurrent;
-using System.IO;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
+﻿using Common.Helper;
 using Common.Helper.Kernel32API;
 using Common.Helper.Kernel32API.Implement;
 using Common.Helper.Kernel32API.Interface;
+using Common.Interfaces.Services;
 using Common.Logging;
+using System.Collections.Concurrent;
 
 namespace ProcessManagement.Services
 {
-    /// <summary>
-    /// Manages external process execution and captures console I/O
-    /// Raises events for console output and user input (via Enter key detection)
-    /// Author: dongnuc
-    /// Date: 2025-10-26
-    /// </summary>
-    public class ProcessManager
+
+    public class ProcessManager : IProcessManager
     {
         #region Fields
 
@@ -32,31 +23,17 @@ namespace ProcessManagement.Services
         // Track active input monitoring tasks
         private readonly ConcurrentDictionary<string, CancellationTokenSource> _monitoringTasks = new();
 
-        // Track active polling tasks
-        private readonly ConcurrentDictionary<string, CancellationTokenSource> _pollingTasks = new();
+        // ✅ Store process handles for capture
+        private readonly ConcurrentDictionary<string, (ChildProcess child, IntPtr mutex)> _processHandles = new();
 
-        // Buffer recent console lines for input capture
-        private readonly ConcurrentDictionary<string, Queue<string>> _recentOutputBuffers = new();
-        private const int BUFFER_SIZE = 5;
+        // ✅ Store previous console snapshots (for difference detection)
+        private readonly ConcurrentDictionary<string, string> _previousSnapshots = new();
 
         #endregion
 
         #region Events
-
-        /// <summary>
-        /// Event raised when client console outputs text
-        /// </summary>
         public event Action<string> OnClientOutput;
-
-        /// <summary>
-        /// Event raised when server console outputs text
-        /// </summary>
         public event Action<string> OnServerOutput;
-
-        /// <summary>
-        /// Event raised when user inputs text (detected by Enter key press)
-        /// Parameters: (input, dataType)
-        /// </summary>
         public event Action<string, string> OnUserInput;
 
         #endregion
@@ -71,24 +48,21 @@ namespace ProcessManagement.Services
             _mutexManager = new MutexManager();
             _consoleManager = new ConsoleManager();
             _processWaiter = new ProcessWaiter();
-
             LogManager.Instance.LogDebug("ProcessManager initialized");
         }
 
         #endregion
 
-        #region Start Single Process with Continuous Polling
-
+        #region Start Single Process (New Logic)
         /// <summary>
-        /// Start single process with continuous console polling and Enter key monitoring
-        /// Returns control immediately for manual lifecycle management
+        /// ✅ V4.0: Start process và capture initial output
         /// </summary>
         /// <param name="exePath">Path to executable</param>
         /// <param name="name">Process name (e.g., "Client" or "Server")</param>
         /// <param name="isClient">True if client, false if server</param>
         /// <param name="showConsoleMessages">Show debug console messages</param>
         /// <returns>Tuple of (ChildProcess, Mutex, CancellationTokenSource)</returns>
-        public (ChildProcess child, IntPtr mutex, CancellationTokenSource cts) StartSingleWithPolling(
+        public async Task<(ChildProcess child, IntPtr mutex, CancellationTokenSource cts)> StartSingleWithPollingAsync(
             string exePath,
             string name,
             bool isClient = true,
@@ -102,22 +76,22 @@ namespace ProcessManagement.Services
 
             LogManager.Instance.LogInfomation($"🚀 Starting {name} process: {Path.GetFileName(exePath)}");
 
-            // Start process
+            //  Start process
             var (child, mutex) = StartSingle(exePath, name, showConsoleMessages);
 
-            // Initialize output buffer for this process
-            _recentOutputBuffers[name] = new Queue<string>(BUFFER_SIZE);
+            // Store process handles
+            _processHandles[name] = (child, mutex);
 
-            // Create cancellation token for this process
+            await Task.Delay(2000);
+
+            //  Capture INITIAL output (lần đầu tiên)
+            await CaptureAndRaiseInitialOutputAsync(child, mutex, name, isClient);
+
+            // Start Enter key monitoring (chỉ cho client)
             var cts = new CancellationTokenSource();
-
-            // ✅ Start continuous console polling
-            StartContinuousPolling(child, mutex, name, isClient, cts.Token);
-
-            // Start input monitoring for client process only
             if (isClient)
             {
-                StartInputMonitoring(child, name);
+                StartInputMonitoring(child, mutex, name, cts.Token);
             }
 
             LogManager.Instance.LogInfomation($"✅ {name} process started with PID: {child.processId}");
@@ -126,95 +100,56 @@ namespace ProcessManagement.Services
         }
 
         /// <summary>
-        /// Continuously poll console output until cancelled
+        /// ✅ Capture initial output khi start process (lần đầu tiên)
         /// </summary>
-        private void StartContinuousPolling(
+        private async Task CaptureAndRaiseInitialOutputAsync(
             ChildProcess child,
             IntPtr mutex,
             string processName,
-            bool isClient,
-            CancellationToken cancellationToken)
+            bool isClient)
         {
-            Task.Run(async () =>
+            try
             {
-                LogManager.Instance.LogDebug($"📡 Started continuous polling for {processName}");
+                LogManager.Instance.LogInfomation($"📸 Capturing initial output for {processName}");
 
-                int emptyPollCount = 0;
-                const int MAX_EMPTY_POLLS = 100; // Stop after 100 consecutive empty polls
+                string initialOutput = await _consolePoller.CaptureCurrentConsoleAsync(
+                    child,
+                    mutex,
+                    expandBuffer: true  // Expand buffer lần đầu
+                );
 
-                while (!cancellationToken.IsCancellationRequested)
+                if (!string.IsNullOrWhiteSpace(initialOutput))
                 {
-                    try
+                    _previousSnapshots[processName] = initialOutput;
+
+                    LogManager.Instance.LogInfomation($"✅ Initial output captured ({initialOutput.Length} chars)");
+                    LogManager.Instance.LogDebug($"📝 Initial content:\n{initialOutput}");
+
+                    if (isClient)
                     {
-                        // Check if process is still alive
-                        if (child.hProcess == IntPtr.Zero)
-                        {
-                            LogManager.Instance.LogDebug($"Process {processName} terminated, stopping polling");
-                            break;
-                        }
-
-                        // ✅ FIX: Use PollOnceAsync instead of PollAsync
-                        string newOutput = await _consolePoller.PollOnceAsync(child, mutex);
-
-                        if (!string.IsNullOrWhiteSpace(newOutput))
-                        {
-                            emptyPollCount = 0; // Reset counter
-                            ProcessLogOutput(newOutput, isClient, processName);
-                        }
-                        else
-                        {
-                            emptyPollCount++;
-
-                            // If too many empty polls, process might have terminated
-                            if (emptyPollCount >= MAX_EMPTY_POLLS)
-                            {
-                                LogManager.Instance.LogDebug($"Process {processName} appears inactive after {MAX_EMPTY_POLLS} empty polls");
-                                break;
-                            }
-                        }
-
-                        // ✅ Poll every 200ms (adjust as needed)
-                        await Task.Delay(200, cancellationToken);
+                        OnClientOutput?.Invoke(initialOutput);
                     }
-                    catch (TaskCanceledException)
+                    else
                     {
-                        LogManager.Instance.LogDebug($"Polling cancelled for {processName}");
-                        break;
-                    }
-                    catch (Exception ex)
-                    {
-                        LogManager.Instance.LogError($"Error polling {processName}: {ex.Message}");
-                        await Task.Delay(1000, cancellationToken); // Wait before retry
+                        OnServerOutput?.Invoke(initialOutput);
                     }
                 }
-
-                LogManager.Instance.LogDebug($"📡 Stopped continuous polling for {processName}");
-            }, cancellationToken);
-        }
-
-        /// <summary>
-        /// Extract new output by comparing with previous output
-        /// </summary>
-        private string GetNewOutput(string previousOutput, string currentOutput)
-        {
-            if (string.IsNullOrWhiteSpace(previousOutput))
-                return currentOutput;
-
-            if (currentOutput.Length <= previousOutput.Length)
-                return string.Empty;
-
-            // Get the new part (everything after previous output)
-            return currentOutput.Substring(previousOutput.Length);
+                else
+                {
+                    LogManager.Instance.LogWarning($"⚠️ No initial output for {processName}");
+                    _previousSnapshots[processName] = string.Empty;
+                }
+            }
+            catch (Exception ex)
+            {
+                LogManager.Instance.LogError($"❌ Error capturing initial output for {processName}: {ex.Message}");
+                _previousSnapshots[processName] = string.Empty;
+            }
         }
 
         /// <summary>
         /// Stop single process and cleanup monitoring
         /// </summary>
-        /// <param name="child">Child process handle</param>
-        /// <param name="mutex">Mutex handle</param>
-        /// <param name="cts">Cancellation token source</param>
-        /// <param name="name">Process name</param>
-        /// <param name="showConsoleMessages">Show debug messages</param>
         public async Task StopSingleAsync(
             ChildProcess child,
             IntPtr mutex,
@@ -226,22 +161,21 @@ namespace ProcessManagement.Services
 
             try
             {
-                // ✅ Cancel continuous polling
+                // Cancel monitoring
                 cts?.Cancel();
-
-                // Stop input monitoring
                 StopInputMonitoring(name);
 
-                // Remove output buffer
-                _recentOutputBuffers.TryRemove(name, out _);
+                // Cleanup
+                _processHandles.TryRemove(name, out _);
+                _previousSnapshots.TryRemove(name, out _);
 
                 // Close process
                 CloseSingle(child, mutex, showConsoleMessages);
 
-                // Dispose cancellation token
+                // Dispose
                 cts?.Dispose();
 
-                LogManager.Instance.LogInfomation($"✅ {name} process stopped");
+                LogManager.Instance.LogInfomation($" {name} process stopped");
             }
             catch (Exception ex)
             {
@@ -253,20 +187,21 @@ namespace ProcessManagement.Services
 
         #endregion
 
-        #region Input Monitoring (Enter Key Detection)
+        #region Input Monitoring (Enter Key Detection) - New Logic
 
         /// <summary>
-        /// Monitor Enter key press in console to detect user input
-        /// Triggers OnUserInput event when Enter is pressed
+        /// ✅ V4.0: Monitor Enter key và trigger capture sequence
         /// </summary>
-        /// <param name="child">Child process to monitor</param>
-        /// <param name="processName">Process name for logging</param>
-        private void StartInputMonitoring(ChildProcess child, string processName)
+        private void StartInputMonitoring(
+            ChildProcess child,
+            IntPtr mutex,
+            string processName,
+            CancellationToken cancellationToken)
         {
             // Cancel existing monitoring if any
             StopInputMonitoring(processName);
 
-            var cts = new CancellationTokenSource();
+            var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             _monitoringTasks[processName] = cts;
 
             Task.Run(async () =>
@@ -275,49 +210,37 @@ namespace ProcessManagement.Services
 
                 bool lastEnterState = false;
                 DateTime lastTriggerTime = DateTime.MinValue;
-                const int DEBOUNCE_MS = 300; // Debounce time to avoid multiple triggers
+                const int DEBOUNCE_MS = 300;
 
                 while (!cts.Token.IsCancellationRequested)
                 {
                     try
                     {
-                        // Check if process is still alive
                         if (child.hProcess == IntPtr.Zero)
                         {
                             LogManager.Instance.LogDebug($"Process {processName} handle is null, stopping monitor");
                             break;
                         }
 
-                        // Check Enter key state (VK_RETURN = 0x0D)
-                        bool currentEnterState = _keyListener.IsKeyPressed(0x0D);
+                        // Check Enter key state 0x0D => enter | 0x7B => F12
+                        bool currentEnterState = _keyListener.IsKeyPressed(Constants.VK_F12);
 
-                        // Detect key press (transition from not pressed to pressed)
                         if (currentEnterState && !lastEnterState)
                         {
-                            // Debounce: Prevent multiple triggers
                             var timeSinceLastTrigger = DateTime.Now - lastTriggerTime;
                             if (timeSinceLastTrigger.TotalMilliseconds > DEBOUNCE_MS)
                             {
-                                // ✅ V3.0: CAPTURE INPUT BEFORE DELAY
-                                // Lấy snapshot của buffer TRƯỚC KHI console cập nhật
-                                string capturedInput = GetRecentInput(processName);
-                                
-                                // Wait for key to be released and console buffer to update
-                                await Task.Delay(150, cts.Token);
+                                LogManager.Instance.LogInfomation($" ===== ENTER KEY PRESSED in {processName} =====");
 
-                                LogManager.Instance.LogInfomation($"⌨️ Enter key detected in {processName} - Input: {capturedInput}");
-
-                                // Raise input event
-                                OnUserInput?.Invoke(capturedInput, "UserInput");
+                                // Execute capture sequence
+                                await ExecuteCaptureSequenceAsync(child, mutex, processName);
 
                                 lastTriggerTime = DateTime.Now;
                             }
                         }
 
                         lastEnterState = currentEnterState;
-
-                        // Check every 50ms
-                        await Task.Delay(50, cts.Token);
+                        await Task.Delay(10, cts.Token);
                     }
                     catch (TaskCanceledException)
                     {
@@ -326,7 +249,7 @@ namespace ProcessManagement.Services
                     catch (Exception ex)
                     {
                         LogManager.Instance.LogError($"Error in input monitoring for {processName}: {ex.Message}");
-                        await Task.Delay(1000, cts.Token); // Wait before retry
+                        await Task.Delay(1000, cts.Token);
                     }
                 }
 
@@ -335,9 +258,102 @@ namespace ProcessManagement.Services
         }
 
         /// <summary>
+        /// ✅ FIXED: Execute capture sequence với intelligent polling
+        /// </summary>
+        /// ✅ V4.1 FIXED: Execute capture sequence với adaptive polling và longer timeout
+        /// </summary>
+        private async Task ExecuteCaptureSequenceAsync(
+            ChildProcess child,
+            IntPtr mutex,
+            string processName)
+        {
+            try
+            {
+                //Capture BEFORE
+                LogManager.Instance.LogDebug($" 1: Capturing BEFORE snapshot");
+                string bufferBefore = _previousSnapshots[processName];
+
+
+                // Capture AFTER 
+                LogManager.Instance.LogDebug($" 3: Capturing AFTER snapshot (with input)");
+                string bufferAfterInput = await _consolePoller.CaptureCurrentConsoleAsync(
+                    child,
+                    mutex,
+                    expandBuffer: false
+                );
+
+                // Extract input value
+                LogManager.Instance.LogDebug($"4: Extracting input value");
+                string extractedCapture = DataInspector.ExtractDifference(
+                    bufferBefore,
+                    bufferAfterInput
+                );
+                LogManager.Instance.LogInfomation($" Extracted input: [{extractedCapture}]");
+                // có thể thay equals => contain đối với bài nhiều client
+                bool isClient = processName.Equals("Client", StringComparison.OrdinalIgnoreCase);
+
+                if (isClient)
+                {
+                    var (input, outputClient) = DataInspector.SplitInputFromOutput(extractedCapture);
+                    if (input != null && !string.IsNullOrWhiteSpace(input))
+                    {
+                        OnUserInput?.Invoke(input, "UserInput");
+                    }
+                    else
+                    {
+                        OnUserInput?.Invoke($"[Input at {DateTime.Now:HH:mm:ss}]", "UserInput");
+                        LogManager.Instance.LogWarning($" Could not extract input");
+                    }
+                    LogManager.Instance.LogDebug($" STEP 5: Raising OnUserInput event");
+                    OnClientOutput?.Invoke(outputClient);
+                }
+                else
+                {
+                    LogManager.Instance.LogDebug($"Processing SERVER capture");
+                    if (!string.IsNullOrWhiteSpace(extractedCapture))
+                    {
+                        var outputSplit = extractedCapture.Split(new[] { "\r\n", "\n", "\r" }, StringSplitOptions.None);
+                        var outputLines = outputSplit.Skip(1).Where(l => !string.IsNullOrWhiteSpace(l));
+                        string outputResult = "";
+                        outputResult = string.Join(Environment.NewLine, outputLines);
+                        OnServerOutput?.Invoke(outputResult);
+                    }
+                }
+
+                //  Update previous snapshot IMMEDIATELY after extracting input
+                _previousSnapshots[processName] = bufferAfterInput;
+                LogManager.Instance.LogDebug($" Updated previous snapshot for {processName} (length: {bufferAfterInput.Length})");
+
+                if (isClient)
+                {
+                    if (_processHandles.TryGetValue("Server", out var serverHandles))
+                    {
+                        var (serverChild, serverMutex) = serverHandles;
+                        try
+                        {
+                            await ExecuteCaptureSequenceAsync(serverChild, serverMutex, "Server");
+                        }
+                        catch (Exception ex)
+                        {
+                            LogManager.Instance.LogError($" Failed to auto-capture Server: {ex.Message}");
+                        }
+                    }
+                }
+                else
+                {
+                    LogManager.Instance.LogWarning($" Server process not found for auto-capture");
+                }
+            }
+            catch (Exception ex)
+            {
+                LogManager.Instance.LogError($" Error in capture sequence: {ex.Message}");
+                LogManager.Instance.LogError($"Stack trace: {ex.StackTrace}");
+            }
+        }
+
+        /// <summary>
         /// Stop input monitoring for specific process
         /// </summary>
-        /// <param name="processName">Process name</param>
         private void StopInputMonitoring(string processName)
         {
             if (_monitoringTasks.TryRemove(processName, out var cts))
@@ -346,85 +362,13 @@ namespace ProcessManagement.Services
                 {
                     cts?.Cancel();
                     cts?.Dispose();
-                    LogManager.Instance.LogDebug($"🛑 Input monitoring stopped for {processName}");
+                    LogManager.Instance.LogDebug($" Input monitoring stopped for {processName}");
                 }
                 catch (Exception ex)
                 {
                     LogManager.Instance.LogError($"Error stopping input monitoring: {ex.Message}");
                 }
             }
-        }
-
-        /// <summary>
-        /// ✅ V3.0 IMPROVED: Get recent input from output buffer
-        /// Lọc ra line cuối cùng KHÔNG phải system message
-        /// </summary>
-        /// <param name="processName">Process name</param>
-        /// <returns>Recent input text or timestamp placeholder</returns>
-        private string GetRecentInput(string processName)
-        {
-            if (_recentOutputBuffers.TryGetValue(processName, out var buffer))
-            {
-                // ✅ Duyệt buffer từ cuối lên để tìm line KHÔNG phải system message
-                var lines = buffer.Reverse().ToList();
-                
-                foreach (var line in lines)
-                {
-                    if (!string.IsNullOrWhiteSpace(line))
-                    {
-                        var trimmedLine = line.Trim();
-                        
-                        // ✅ Filter out system messages
-                        if (!IsSystemMessage(trimmedLine))
-                        {
-                            LogManager.Instance.LogDebug($"🔍 GetRecentInput found: {trimmedLine}");
-                            return trimmedLine;
-                        }
-                        else
-                        {
-                            LogManager.Instance.LogDebug($"🔍 GetRecentInput skipped system message: {trimmedLine}");
-                        }
-                    }
-                }
-                
-                LogManager.Instance.LogDebug($"🔍 GetRecentInput: No valid input found in buffer");
-            }
-            else
-            {
-                LogManager.Instance.LogDebug($"🔍 GetRecentInput: Buffer not found for {processName}");
-            }
-
-            // Fallback: Return timestamp
-            return $"[Input at {DateTime.Now:HH:mm:ss}]";
-        }
-
-        /// <summary>
-        /// ✅ V3.0 IMPROVED: Check if line is a system message (not user input)
-        /// Thêm nhiều keywords để filter chính xác hơn
-        /// </summary>
-        private bool IsSystemMessage(string line)
-        {
-            var lowerLine = line.ToLower();
-
-            string[] systemKeywords = {
-                "server", "client", "listening", "connected", "starting",
-                "loading", "waiting", "initializing", "ready", "status",
-                "error", "warning", "info", "debug", "received", "sent",
-                "processing", "response", "request", "sending", "receiving",
-                "established", "closed", "opened", "failed", "success",
-                "connecting", "disconnecting", "message from", "reply from"
-            };
-
-            // ✅ Check if line contains ANY system keyword
-            bool isSystem = systemKeywords.Any(keyword => lowerLine.Contains(keyword));
-            
-            // ✅ Additional check: Lines starting with timestamps or log levels
-            if (lowerLine.StartsWith("[") || lowerLine.StartsWith("->") || lowerLine.StartsWith("<-"))
-            {
-                isSystem = true;
-            }
-
-            return isSystem;
         }
 
         #endregion
@@ -449,8 +393,6 @@ namespace ProcessManagement.Services
 
             IntPtr mutex = _mutexManager.Create($"Global\\ConsoleAttachMutex_{name}");
             ChildProcess child = _processStarter.Start(exePath, name);
-
-            Thread.Sleep(2000); // Wait for console initialization
 
             if (showConsoleMessages)
             {
@@ -490,55 +432,6 @@ namespace ProcessManagement.Services
 
         #endregion
 
-        #region Log Processing
-
-        /// <summary>
-        /// Process console log output and raise appropriate events
-        /// Stores recent lines in buffer for input detection
-        /// </summary>
-        private void ProcessLogOutput(string log, bool isClient, string processName)
-        {
-            if (string.IsNullOrWhiteSpace(log))
-                return;
-
-            LogManager.Instance.LogDebug($"🔍 ProcessLogOutput called - Process: {processName}, IsClient: {isClient}, LogLength: {log.Length}");
-
-            var lines = log.Split(new[] { Environment.NewLine, "\n", "\r" }, StringSplitOptions.RemoveEmptyEntries);
-
-            LogManager.Instance.LogDebug($"🔍 Split into {lines.Length} lines");
-
-            foreach (var line in lines)
-            {
-                if (string.IsNullOrWhiteSpace(line)) continue;
-
-                // Add to recent output buffer
-                if (_recentOutputBuffers.TryGetValue(processName, out var buffer))
-                {
-                    buffer.Enqueue(line);
-
-                    // Keep buffer size limited
-                    while (buffer.Count > BUFFER_SIZE)
-                    {
-                        buffer.Dequeue();
-                    }
-                }
-
-                // Raise output event
-                if (isClient)
-                {
-                    LogManager.Instance.LogDebug($"📤 Raising OnClientOutput: {line}");
-                    OnClientOutput?.Invoke(line);
-                }
-                else
-                {
-                    LogManager.Instance.LogDebug($"📤 Raising OnServerOutput: {line}");
-                    OnServerOutput?.Invoke(line);
-                }
-            }
-        }
-
-        #endregion
-
         #region Cleanup
 
         /// <summary>
@@ -554,20 +447,25 @@ namespace ProcessManagement.Services
                 StopInputMonitoring(kvp.Key);
             }
 
-            // Stop all polling tasks
-            foreach (var kvp in _pollingTasks.ToList())
-            {
-                kvp.Value?.Cancel();
-                kvp.Value?.Dispose();
-            }
-
-            // Clear buffers
-            _recentOutputBuffers.Clear();
-            _pollingTasks.Clear();
+            // Clear dictionaries
+            _processHandles.Clear();
+            _previousSnapshots.Clear();
 
             LogManager.Instance.LogDebug("ProcessManager disposed");
+        }
+
+        public void CloseClient()
+        {
+            throw new NotImplementedException();
+        }
+
+        public void CloseServer()
+        {
+            throw new NotImplementedException();
         }
 
         #endregion
     }
 }
+
+

@@ -10,7 +10,6 @@ namespace Middleware.Services
 
     public class NetworkTransaction
     {
-        public DateTime Timestamp { get; set; }
         public string Protocol { get; set; }
         public NetworkRequest Request { get; set; }
         public NetworkResponse Response { get; set; }
@@ -53,20 +52,13 @@ namespace Middleware.Services
         #endregion
 
         #region Events
-
-        /// <summary>
-        /// Event raised when network request is captured (Client → Server)
-        /// </summary>
+        // Event raised when network request is captured (Client → Server)
         public event Action<NetworkRequest> OnRequestCaptured;
 
-        /// <summary>
-        /// Event raised when network response is captured (Server → Client)
-        /// </summary>
+        // Event raised when network response is captured (Server → Client)
         public event Action<NetworkResponse> OnResponseCaptured;
 
-        /// <summary>
-        /// Event raised when complete network transaction is captured
-        /// </summary>
+        // Event raised when complete network transaction is captured
         public event Action<NetworkTransaction> OnTransactionCompleted;
 
         #endregion
@@ -86,7 +78,7 @@ namespace Middleware.Services
             _cts = new CancellationTokenSource();
             _isSessionRunning = true;
 
-            LogManager.Instance.LogInfomation($"🌐 Starting {(useHttp ? "HTTP" : "TCP")} middleware - Proxy:{proxyPort}, Server:{serverPort}");
+            LogManager.Instance.LogInfomation($" Starting {(useHttp ? "HTTP" : "TCP")} middleware - Proxy:{proxyPort}, Server:{serverPort}");
 
             if (useHttp)
             {
@@ -106,7 +98,7 @@ namespace Middleware.Services
 
             try
             {
-                LogManager.Instance.LogInfomation("⏹️ Stopping middleware...");
+                LogManager.Instance.LogInfomation("Stopping middleware...");
 
                 _isSessionRunning = false;
                 _cts?.Cancel();
@@ -125,7 +117,7 @@ namespace Middleware.Services
                     _tcpListener = null;
                 }
 
-                LogManager.Instance.LogInfomation("✅ Middleware stopped");
+                LogManager.Instance.LogInfomation(" Middleware stopped");
             }
             catch (Exception ex)
             {
@@ -179,7 +171,6 @@ namespace Middleware.Services
             var request = context.Request;
             var transaction = new NetworkTransaction
             {
-                Timestamp = DateTime.Now,
                 Protocol = "HTTP"
             };
 
@@ -207,7 +198,7 @@ namespace Middleware.Services
                 // 🔔 Raise event: Request captured
                 OnRequestCaptured?.Invoke(transaction.Request);
 
-                LogManager.Instance.LogDebug($"📤 HTTP Request: {request.HttpMethod} {request.Url}");
+                LogManager.Instance.LogDebug($" HTTP Request: {request.HttpMethod} {request.Url}");
 
                 // 2. Forward to real server
                 var realServerUrl = $"http://localhost:{_serverPort}{request.Url?.AbsolutePath}";
@@ -238,7 +229,7 @@ namespace Middleware.Services
                 // 🔔 Raise event: Response captured
                 OnResponseCaptured?.Invoke(transaction.Response);
 
-                LogManager.Instance.LogDebug($"📥 HTTP Response: {responseMessage.StatusCode}");
+                LogManager.Instance.LogDebug($" HTTP Response: {responseMessage.StatusCode}");
 
                 // 4. Send response back to client
                 var response = context.Response;
@@ -312,7 +303,6 @@ namespace Middleware.Services
         {
             var transaction = new NetworkTransaction
             {
-                Timestamp = DateTime.Now,
                 Protocol = "TCP",
                 Request = new NetworkRequest { Method = "TCP" },
                 Response = new NetworkResponse { StatusCode = "OK" }

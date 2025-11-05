@@ -20,9 +20,6 @@ namespace Common.Helper.Kernel32API
         [DllImport("kernel32.dll")]
         static extern uint GetLastError();
 
-        const uint CREATE_NEW_CONSOLE = 0x00000010;
-        const uint CREATE_NEW_PROCESS_GROUP = 0x00000200;
-
         public ChildProcess Start(string exePath, string name)
         {
             STARTUPINFO si = new STARTUPINFO();
@@ -36,7 +33,7 @@ namespace Common.Helper.Kernel32API
                 IntPtr.Zero,
                 IntPtr.Zero,
                 false,
-                CREATE_NEW_CONSOLE | CREATE_NEW_PROCESS_GROUP,
+                Constants.CREATE_NEW_CONSOLE | Constants.CREATE_NEW_PROCESS_GROUP,
                 IntPtr.Zero,
                 null,
                 ref si,

@@ -19,8 +19,6 @@ namespace Common.Helper.Kernel32API
         [DllImport("kernel32.dll")]
         static extern bool CloseHandle(IntPtr hObject);
 
-        const uint CTRL_C_EVENT = 0;
-
         public void Free()
         {
             FreeConsole();
@@ -36,7 +34,7 @@ namespace Common.Helper.Kernel32API
             mutexManager.Wait(mutex);
             if (AttachConsole(processId))
             {
-                GenerateConsoleCtrlEvent(CTRL_C_EVENT, 0);
+                GenerateConsoleCtrlEvent(Constants.CTRL_C_EVENT, 0);
                 FreeConsole();
             }
             mutexManager.Release(mutex);

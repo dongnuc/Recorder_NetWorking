@@ -7,14 +7,55 @@
         mc:Ignorable="d"
         Title="RecorderWindow" Height="450" Width="800">
     <DockPanel>
-        <!-- Top Button Bar -->
         <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="5">
-            <Button Content="🗑️ Delete Stage" Width="120" Margin="5,0,0,0" 
-                Click="BtnDeleteStage_Click"
-                Background="#E74C3C" Foreground="White"
-                BorderThickness="0" Cursor="Hand"
-                Padding="5"
-                ToolTip="Delete the selected stage and all its data"/>
+            <Button Content="📥 Export Data" 
+                    Width="120" 
+                    Margin="5,0,0,0" 
+                    Click="BtnExportData_Click"
+                    Background="#27AE60" 
+                    Foreground="White"
+                    BorderThickness="0" 
+                    Cursor="Hand"
+                    Padding="5"
+                    ToolTip="Export all test data to JSON file"/>
+
+            <Button Content="🗑️ Delete Stage" 
+                    Width="120" 
+                    Margin="5,0,0,0" 
+                    Click="BtnDeleteStage_Click"
+                    Background="#E74C3C" 
+                    Foreground="White"
+                    BorderThickness="0" 
+                    Cursor="Hand"
+                    Padding="5"
+                    ToolTip="Delete the selected stage and all its data"/>
+
+            <!-- Separator -->
+            <Separator Width="2" Background="LightGray" Margin="10,0"/>
+
+            <!-- Close Client Button -->
+            <Button Content="🔴 Close Client" 
+                    Width="120" 
+                    Margin="5,0,0,0" 
+                    Click="BtnCloseClient_Click"
+                    Background="#E67E22" 
+                    Foreground="White"
+                    BorderThickness="0" 
+                    Cursor="Hand"
+                    Padding="5"
+                    ToolTip="Stop and close the client process"/>
+
+            <!-- Close Server Button -->
+            <Button Content="🔴 Close Server" 
+                    Width="120" 
+                    Margin="5,0,0,0" 
+                    Click="BtnCloseServer_Click"
+                    Background="#9B59B6" 
+                    Foreground="White"
+                    BorderThickness="0" 
+                    Cursor="Hand"
+                    Padding="5"
+                    ToolTip="Stop and close the server process"/>
         </StackPanel>
 
         <!-- Stage Selection ComboBox -->
@@ -28,8 +69,8 @@
                   VerticalAlignment="Center"
                   FontSize="12"/>
             <TextBlock Margin="10,0,0,0" VerticalAlignment="Center" Foreground="Gray">
-            <Run Text="Total Stages: "/>
-            <Run Text="{Binding StageKeys.Count, Mode=OneWay}" FontWeight="Bold"/>
+                <Run Text="Total Stages: "/>
+                <Run Text="{Binding StageKeys.Count, Mode=OneWay}" FontWeight="Bold"/>
             </TextBlock>
         </StackPanel>
 
@@ -189,6 +230,64 @@
                                     </DataGridTextColumn>
                                     <DataGridTextColumn Header="DataType" Binding="{Binding DataTypeMiddleware}" Width="120"/>
                                     <DataGridTextColumn Header="Bytes" Binding="{Binding ByteSize}" Width="80"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </Grid>
+                    </TabItem>
+
+                    <!-- Output DB Tab - NEW -->
+                    <TabItem Header="Output DB">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <!-- Delete Button for Output DB -->
+                            <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="5" HorizontalAlignment="Right">
+                                <Button Content="🗑️ Delete Selected" 
+                                    Click="BtnDeleteOutputDB_Click"
+                                    Background="#E67E22" 
+                                    Foreground="White"
+                                    BorderThickness="0" 
+                                    Cursor="Hand"
+                                    Padding="8,4"
+                                    ToolTip="Delete selected output DB row"/>
+                            </StackPanel>
+
+                            <DataGrid Grid.Row="1"
+                                  x:Name="dgOutputDB"
+                                  ItemsSource="{Binding SelectedStageData.OutputDBs, Mode=TwoWay}"
+                                  IsReadOnly="False"
+                                  AutoGenerateColumns="False"
+                                  CanUserAddRows="True"
+                                  CanUserDeleteRows="True"
+                                  SelectionMode="Single">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Stage" 
+                                                    Binding="{Binding Stage, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" 
+                                                    Width="70" 
+                                                    IsReadOnly="False"/>
+                                    <DataGridTextColumn Header="Query" 
+                                                    Binding="{Binding Query, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" 
+                                                    Width="*" 
+                                                    IsReadOnly="False">
+                                        <DataGridTextColumn.ElementStyle>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="TextWrapping" Value="Wrap"/>
+                                            </Style>
+                                        </DataGridTextColumn.ElementStyle>
+                                    </DataGridTextColumn>
+                                    <DataGridTextColumn Header="Expected Data" 
+                                                    Binding="{Binding ExpectedData, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" 
+                                                    Width="2*" 
+                                                    IsReadOnly="False">
+                                        <DataGridTextColumn.ElementStyle>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="TextWrapping" Value="Wrap"/>
+                                            </Style>
+                                        </DataGridTextColumn.ElementStyle>
+                                    </DataGridTextColumn>
                                 </DataGrid.Columns>
                             </DataGrid>
                         </Grid>

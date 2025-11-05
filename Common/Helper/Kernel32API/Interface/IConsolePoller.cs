@@ -2,11 +2,15 @@
 {
     public interface IConsolePoller
     {
-        Task<string> PollAsync(ChildProcess child, IntPtr mutex);
-        
-        /// <summary>
-        /// Poll console buffer once and return new output immediately (non-blocking)
-        /// </summary>
-        Task<string> PollOnceAsync(ChildProcess child, IntPtr mutex);
+        Task<string> CaptureCurrentConsoleAsync(
+           ChildProcess child,
+           IntPtr mutex,
+           bool expandBuffer = true);
+        Task<string> CaptureCurrentConsoleWithRetryAsync(
+            ChildProcess child,
+            IntPtr mutex,
+            int maxRetries = 3,
+            int retryDelayMs = 200,
+            bool expandBuffer = true);
     }
 }

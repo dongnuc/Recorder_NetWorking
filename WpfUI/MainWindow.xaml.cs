@@ -102,37 +102,10 @@ namespace WpfUI
 
                 // Create RecorderWindow
                 TxtStatus.Text = "🎙️ Opening recorder...";
-                var recorderWindow = new RecorderWindow(testCaseName, processManager);
+                var recorderWindow = new RecorderWindow(testCaseName, clientPath,serverPath);
                 recorderWindow.Title = $"Recording: {testCaseName}";
                 recorderWindow.Show();
 
-                // ✅ Start Server process (returns CancellationTokenSource)
-                TxtStatus.Text = "🖥️ Starting server...";
-                var (serverChild, serverMutex, serverCts) = processManager.StartSingleWithPolling(
-                    serverPath,
-                    "Server",
-                    isClient: false,
-                    showConsoleMessages: false
-                );
-
-                // Wait for server to initialize
-                await Task.Delay(2000);
-
-                // ✅ Start Client process (returns CancellationTokenSource)
-                TxtStatus.Text = "💻 Starting client...";
-                var (clientChild, clientMutex, clientCts) = processManager.StartSingleWithPolling(
-                    clientPath,
-                    "Client",
-                    isClient: true,
-                    showConsoleMessages: false
-                );
-
-                // ✅ Store process info in RecorderWindow (with CancellationTokenSource)
-                recorderWindow.SetProcessInfo(
-                    clientChild, clientMutex, clientCts,
-                    serverChild, serverMutex, serverCts,
-                    processManager
-                );
 
                 TxtStatus.Text = "✅ Recording started successfully!";
                 LogManager.Instance.LogInfomation($"✅ Recording started - Test Case: {testCaseName}");
