@@ -1,0 +1,101 @@
+﻿using Common.Interfaces.IOFile;
+using Common.Logging;
+using FileManagement.FileHelper.FileHandler;  
+using FileManagement.FolderHelper;  
+using Microsoft.Win32;
+using OfficeOpenXml;               
+using System;
+using System.IO;
+using System.Windows;
+using WpfUI.ViewModels;        
+
+namespace WpfUI
+{
+    public partial class ProjectSetupWindow : Window
+    {
+        private readonly IOFolderHandler _folderHandler;
+        private readonly IOFileHandler _fileHandler;
+
+        public ProjectSetupWindow()
+        {
+            InitializeComponent();
+
+            ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
+
+            _folderHandler = new FolderHandler();
+            _fileHandler = new ExcelExecution();
+
+            LogManager.Instance.LogInfomation("🚀 ProjectSetupWindow opened");
+        }
+
+        #region Browse Buttons
+        private void BtnBrowseFolder_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new OpenFileDialog { ValidateNames = false, CheckFileExists = false, CheckPathExists = true, FileName = "Select Folder", Title = "Select the base folder to create your project in" };
+            if (dialog.ShowDialog() == true) { TxtProjectLocation.Text = Path.GetDirectoryName(dialog.FileName); }
+        }
+        private void BtnBrowseClient_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new OpenFileDialog { Filter = "Executable (*.exe)|*.exe" };
+            if (dialog.ShowDialog() == true) TxtClientPath.Text = dialog.FileName;
+        }
+        private void BtnBrowseServer_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new OpenFileDialog { Filter = "Executable (*.exe)|*.exe" };
+            if (dialog.ShowDialog() == true) TxtServerPath.Text = dialog.FileName;
+        }
+        #endregion
+
+        private void BtnCreateProject_Click(object sender, RoutedEventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(TxtProjectName.Text) ||
+                string.IsNullOrWhiteSpace(TxtProjectLocation.Text) ||
+                string.IsNullOrWhiteSpace(TxtClientPath.Text) ||
+                string.IsNullOrWhiteSpace(TxtServerPath.Text))
+            {
+                MessageBox.Show("All fields (Project, Location, Client, Server) are required.", "Error");
+                return;
+            }
+
+            TxtStatus.Text = "⏳ Creating project structure...";
+            BtnCreateProject.IsEnabled = false;
+            try
+            {
+                string basePath = TxtProjectLocation.Text;
+                string projectName = TxtProjectName.Text;
+                string templateDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources", "Templates");
+
+                if (!Directory.Exists(templateDir) ||
+                    !File.Exists(Path.Combine(templateDir, "header.xlsx")) ||
+                    !File.Exists(Path.Combine(templateDir, "environment.xlsx")))
+                {
+                    throw new Exception("Template folder or files ('header.xlsx', 'environment.xlsx') not found. \nPlease check 'Resources/Templates' and set 'Copy to Output Directory'.");
+                }
+
+                string projectRoot = _folderHandler.CreateDirectory(basePath, projectName);
+                _folderHandler.CopyTemplateFromResource(projectRoot, templateDir, false, "header.xlsx", "environment.xlsx");
+                LogManager.Instance.LogInfomation($"Project created at: {projectRoot}");
+
+                var mainViewModel = new MainMenuViewModel(
+                    _folderHandler,
+                    _fileHandler,
+                    projectRoot,
+                    TxtClientPath.Text,
+                    TxtServerPath.Text
+                );
+
+                var mainMenu = new MainMenu(mainViewModel);
+                mainMenu.Show();
+
+                this.Close();
+            }
+            catch (Exception ex)
+            {
+                TxtStatus.Text = "❌ Failed to create project.";
+                LogManager.Instance.LogError($"Failed to create project: {ex.Message}");
+                MessageBox.Show($"Failed to create project: {ex.Message}", "Error");
+                BtnCreateProject.IsEnabled = true;
+            }
+        }
+    }
+}

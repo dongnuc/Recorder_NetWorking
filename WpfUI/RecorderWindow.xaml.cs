@@ -1,4 +1,4 @@
-﻿using Common.Helper.Kernel32API;
+﻿﻿﻿using Common.Helper.Kernel32API;
 using Common.Logging;
 using Common.Models.Entities;
 using Common.Resources;
@@ -148,9 +148,12 @@ namespace WpfUI
         #region Fields
 
         private ProcessManager _processManager;
+
+        // ✅ Changed from Task<string> to CancellationTokenSource
         private ChildProcess _clientChild;
         private IntPtr _clientMutex;
         private CancellationTokenSource _clientCts;
+
         private ChildProcess _serverChild;
         private IntPtr _serverMutex;
         private CancellationTokenSource _serverCts;
@@ -239,6 +242,7 @@ namespace WpfUI
             _testCaseName = testCaseName;
             _clientPath = clientPath;
             _serverPath = serverPath;
+
 
             DataContext = this;
             TestStages = new Dictionary<int, TestStage>();
@@ -395,6 +399,7 @@ namespace WpfUI
             LogManager.Instance.LogDebug($"Data input{input}");
             Dispatcher.Invoke(() =>
             {
+                // ✅ Increment stage ONLY when user inputs (Enter key pressed)
                 _currentStageIndex++;
                 var newTestStage = new TestStage();
 
@@ -1009,7 +1014,7 @@ namespace WpfUI
 
         private void BtnDeleteOutputDB_Click(object sender, RoutedEventArgs e)
         {
-           
+
         }
     }
 }

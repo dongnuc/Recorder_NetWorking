@@ -7,7 +7,5 @@
         public string SaveLocation { get; set; }
         public string ProjectName { get; set; }
         public string Protocol { get; set; }
-        public string ClientAppSettings { get; set; }
-        public string ServerAppSettings { get; set; }
     }
 }

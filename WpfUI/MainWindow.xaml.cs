@@ -6,6 +6,8 @@ using Middleware.Services;
 using ProcessManagement.Services;
 using System.IO;
 using System.Windows;
+using System; // Thêm
+using System.Threading.Tasks; // Thêm
 
 namespace WpfUI
 {
@@ -100,9 +102,19 @@ namespace WpfUI
                 // Create ProcessManager
                 var processManager = new ProcessManager();
 
-                // Create RecorderWindow
+                // Create RecorderWindow (Đây là code gốc)
                 TxtStatus.Text = "🎙️ Opening recorder...";
                 var recorderWindow = new RecorderWindow(testCaseName, clientPath,serverPath);
+                // var recorderWindow = new RecorderWindow(
+                //     testCaseName,
+                //     processManager,
+                //     folderHandler,   // <--- Tiêm vào
+                //     fileHandler      // <--- Tiêm vào
+                // );
+
+                // --- KẾT THÚC SỬA ĐỔI ---
+
+                // var recorderWindow = new RecorderWindow(testCaseName, processManager);
                 recorderWindow.Title = $"Recording: {testCaseName}";
                 recorderWindow.Show();
 
