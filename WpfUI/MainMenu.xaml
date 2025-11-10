@@ -38,7 +38,8 @@
                         Foreground="White" 
                         BorderThickness="0" 
                         Cursor="Hand"
-                        FontWeight="SemiBold"/>
+                        FontWeight="SemiBold"
+                        Click="BtnResetDb_Click"/>
 
                 <TextBlock Text="|" Foreground="#526D8B" VerticalAlignment="Center" Margin="5,0"/>
 

@@ -1,13 +1,14 @@
 ﻿using Common.Interfaces.IOFile;
 using Common.Logging;
-using FileManagement.FileHelper.FileHandler;  
-using FileManagement.FolderHelper;  
+using FileManagement.FileHelper.FileHandler;
+using FileManagement.FolderHelper;
 using Microsoft.Win32;
-using OfficeOpenXml;               
+using OfficeOpenXml;
 using System;
 using System.IO;
 using System.Windows;
-using WpfUI.ViewModels;        
+using WpfUI.ViewModels;
+using WpfUI.Properties; 
 
 namespace WpfUI
 {
@@ -19,13 +20,21 @@ namespace WpfUI
         public ProjectSetupWindow()
         {
             InitializeComponent();
-
             ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
-
             _folderHandler = new FolderHandler();
             _fileHandler = new ExcelExecution();
-
             LogManager.Instance.LogInfomation("🚀 ProjectSetupWindow opened");
+
+            LoadSettings();
+        }
+
+        private void LoadSettings()
+        {
+            TxtProjectLocation.Text = Settings.Default.ProjectPath;
+            TxtClientPath.Text = Settings.Default.ClientExePath;
+            TxtServerPath.Text = Settings.Default.ServerExePath;
+            if (Settings.Default.UseDatabase) { RbDbYes.IsChecked = true; }
+            else { RbDbNo.IsChecked = true; }
         }
 
         #region Browse Buttons
@@ -63,18 +72,39 @@ namespace WpfUI
             {
                 string basePath = TxtProjectLocation.Text;
                 string projectName = TxtProjectName.Text;
-                string templateDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources", "Templates");
+
+                string templateDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
+                                        "Resources", "Templates", "DotnetNetworking", "Question");
 
                 if (!Directory.Exists(templateDir) ||
-                    !File.Exists(Path.Combine(templateDir, "header.xlsx")) ||
-                    !File.Exists(Path.Combine(templateDir, "environment.xlsx")))
+                    !File.Exists(Path.Combine(templateDir, "Header.xlsx")) ||
+                    !File.Exists(Path.Combine(templateDir, "Environment.xlsx")) || 
+                    !File.Exists(Path.Combine(templateDir, "EnvRunDB.xlsx")) ||    
+                    !File.Exists(Path.Combine(templateDir, "EnvRunNoDB.xlsx")))   
                 {
-                    throw new Exception("Template folder or files ('header.xlsx', 'environment.xlsx') not found. \nPlease check 'Resources/Templates' and set 'Copy to Output Directory'.");
+                    throw new Exception("Template folder or files ('Header', 'Environment', 'EnvRunDB', 'EnvRunNoDB') not found in '.../Question'. \nPlease check 'Copy to Output Directory'.");
                 }
 
                 string projectRoot = _folderHandler.CreateDirectory(basePath, projectName);
-                _folderHandler.CopyTemplateFromResource(projectRoot, templateDir, false, "header.xlsx", "environment.xlsx");
-                LogManager.Instance.LogInfomation($"Project created at: {projectRoot}");
+
+                _folderHandler.CopyTemplateFromResource(projectRoot, templateDir, false, "Header.xlsx", "Environment.xlsx");
+
+                bool useDatabase = RbDbYes.IsChecked == true;
+
+                string chosenEnvRunFile = useDatabase ? "EnvRunDB.xlsx" : "EnvRunNoDB.xlsx";
+                string srcSheetPath = Path.Combine(templateDir, chosenEnvRunFile);
+
+                string destEnvPath = Path.Combine(projectRoot, "Environment.xlsx");
+
+                _folderHandler.ReplaceSheetExcel(srcSheetPath, destEnvPath);
+
+                LogManager.Instance.LogInfomation($"Project created at: {projectRoot}. UseDatabase={useDatabase}");
+
+                Settings.Default.ProjectPath = basePath;
+                Settings.Default.ClientExePath = TxtClientPath.Text;
+                Settings.Default.ServerExePath = TxtServerPath.Text;
+                Settings.Default.UseDatabase = useDatabase;
+                Settings.Default.Save();
 
                 var mainViewModel = new MainMenuViewModel(
                     _folderHandler,
@@ -83,7 +113,6 @@ namespace WpfUI
                     TxtClientPath.Text,
                     TxtServerPath.Text
                 );
-
                 var mainMenu = new MainMenu(mainViewModel);
                 mainMenu.Show();
 
@@ -91,7 +120,7 @@ namespace WpfUI
             }
             catch (Exception ex)
             {
-                TxtStatus.Text = "❌ Failed to create project.";
+                TxtStatus.Text = "Failed to create project.";
                 LogManager.Instance.LogError($"Failed to create project: {ex.Message}");
                 MessageBox.Show($"Failed to create project: {ex.Message}", "Error");
                 BtnCreateProject.IsEnabled = true;

@@ -101,12 +101,29 @@ namespace FileManagement.FolderHelper
 
         public void ReplaceSheetExcel(string srcPath, string desPath)
         {
-            // Giả định bạn có lớp ExcelExecution và FileKeywords
-            // Nếu không có, bạn cần cung cấp thêm code ExcelExecution
-            // ExcelExecution excelExecution = new ExcelExecution();
-            // excelExecution.DeleteSheet(desPath, FileKeywords.RUN_SHEET_NAME);
-            // excelExecution.AppendSheetFromSrc(srcPath, desPath);
-            throw new NotImplementedException("Hàm ReplaceSheetExcel cần triển khai lớp ExcelExecution.");
+            var srcFile = new FileInfo(srcPath);
+            var desFile = new FileInfo(desPath);
+
+            using (var srcPackage = new ExcelPackage(srcFile))
+            using (var desPackage = new ExcelPackage(desFile))
+            {
+                var srcSheet = srcPackage.Workbook.Worksheets["Run"];
+
+                if (srcSheet == null)
+                {
+                    throw new Exception($"Sheet 'Run' not found in the source template file: {srcPath}");
+                }
+
+                var desSheet = desPackage.Workbook.Worksheets["Run"];
+                if (desSheet != null)
+                {
+                    desPackage.Workbook.Worksheets.Delete(desSheet);
+                }
+
+                desPackage.Workbook.Worksheets.Add("Run", srcSheet);
+
+                desPackage.Save();
+            }
         }
 
         public void Copy(string sourcePath, string destinationPath, bool overwrite)

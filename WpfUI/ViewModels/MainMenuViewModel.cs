@@ -6,6 +6,7 @@ using System.IO;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System;
+using WpfUI.Properties; 
 
 namespace WpfUI.ViewModels
 {
@@ -17,7 +18,9 @@ namespace WpfUI.ViewModels
         private readonly string _projectPath;
         private readonly string _clientExePath;
         private readonly string _serverExePath;
-        private readonly string _templateDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources", "Templates");
+
+        private readonly string _templateDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
+                                                "Resources", "Templates", "DotnetNetworking", "TestCase");
         #endregion
 
         #region Properties
@@ -37,7 +40,6 @@ namespace WpfUI.ViewModels
             _projectPath = projectPath;
             _clientExePath = clientExePath;
             _serverExePath = serverExePath;
-
             RootItems = new ObservableCollection<FileSystemItemViewModel>();
             LoadFileTree();
         }
@@ -49,27 +51,15 @@ namespace WpfUI.ViewModels
             RootItems.Clear();
             try
             {
-                if (!Directory.Exists(_projectPath))
-                {
-                    _folderHandler.CreateDirectory(_projectPath, "");
-                }
+                if (!Directory.Exists(_projectPath)) { _folderHandler.CreateDirectory(_projectPath, ""); }
 
                 var rootDirectoryInfo = new DirectoryInfo(_projectPath);
-                var rootNode = new FileSystemItemViewModel
-                {
-                    Name = rootDirectoryInfo.Name,
-                    FullPath = rootDirectoryInfo.FullName,
-                    IsFolder = true
-                };
+                var rootNode = new FileSystemItemViewModel { Name = rootDirectoryInfo.Name, FullPath = rootDirectoryInfo.FullName, IsFolder = true };
                 LoadSubFoldersAndFiles(rootNode);
                 RootItems.Add(rootNode);
             }
-            catch (Exception ex)
-            {
-                LogManager.Instance.LogError($"Error loading file tree root: {ex.Message}");
-            }
+            catch (Exception ex) { LogManager.Instance.LogError($"Error loading file tree root: {ex.Message}"); }
         }
-
         private void LoadSubFoldersAndFiles(FileSystemItemViewModel parentNode)
         {
             try
@@ -92,28 +82,36 @@ namespace WpfUI.ViewModels
                 }
             }
             catch (UnauthorizedAccessException) { }
-            catch (Exception ex)
-            {
-                LogManager.Instance.LogWarning($"Could not access path: {parentNode.FullPath}. Error: {ex.Message}");
-            }
+            catch (Exception ex) { LogManager.Instance.LogWarning($"Could not access path: {parentNode.FullPath}. Error: {ex.Message}"); }
         }
 
         public void CreateNewTestCase(string testCaseName)
         {
-            if (string.IsNullOrWhiteSpace(testCaseName))
-            {
-                MessageBox.Show("Test case name cannot be empty.", "Warning");
-                return;
-            }
+            if (string.IsNullOrWhiteSpace(testCaseName)) { MessageBox.Show("Test case name cannot be empty.", "Warning"); return; }
+
             try
             {
                 string testCasePath = _folderHandler.CreateDirectory(_projectPath, testCaseName);
 
-                // Copy 3 file (theo yêu cầu)
-                _folderHandler.CopyTemplateFromResource(testCasePath, _templateDir, false, "detail.xlsx", "header.xlsx", "environment.xlsx");
+                _folderHandler.CopyTemplateFromResource(testCasePath, _templateDir, false,
+                    "Header.xlsx", "Environment.xlsx", "Detail.xlsx");
+
+                bool useDatabase = Settings.Default.UseDatabase;
+
+                string chosenEnvRunFile = useDatabase ? "EnvRunDB.xlsx" : "EnvRunNoDB.xlsx";
+                string srcSheetPath = Path.Combine(_templateDir, chosenEnvRunFile);
+
+                string destEnvPath = Path.Combine(testCasePath, "Environment.xlsx");
+
+                if (!File.Exists(srcSheetPath))
+                {
+                    throw new Exception($"Template file {chosenEnvRunFile} not found in '.../Templates/DotnetNetworking/TestCase'. \nPlease check 'Copy to Output Directory'.");
+                }
+
+                _folderHandler.ReplaceSheetExcel(srcSheetPath, destEnvPath);
 
                 LoadFileTree();
-                LogManager.Instance.LogInfomation($"✅ Created new test case: {testCaseName}");
+                LogManager.Instance.LogInfomation($"✅ Created new test case: {testCaseName}. UseDatabase={useDatabase}");
             }
             catch (Exception ex)
             {
@@ -125,10 +123,7 @@ namespace WpfUI.ViewModels
 
         #region INotifyPropertyChanged
         public event PropertyChangedEventHandler PropertyChanged;
-        protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        }
+        protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null) { PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName)); }
         #endregion
     }
 }
