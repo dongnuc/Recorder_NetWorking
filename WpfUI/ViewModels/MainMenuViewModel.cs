@@ -41,15 +41,17 @@ namespace WpfUI.ViewModels
         public MainMenuViewModel(
             IOFolderHandler folderHandler,
             IOFileHandler fileHandler,
-            string projectPath)
+            string projectPath,
+            string clientExePath,
+            string serverExePath,
+            bool isHttp)
         {
             _folderHandler = folderHandler;
             _fileHandler = fileHandler;
             _projectPath = projectPath;
-
-            _clientExePath = Settings.Default.ClientExePath;
-            _serverExePath = Settings.Default.ServerExePath;
-
+            _clientExePath = clientExePath;
+            _serverExePath = serverExePath;
+            _isHtpp = isHttp;
             RootItems = new ObservableCollection<FileSystemItemViewModel>();
             LoadFileTree();
         }
@@ -215,6 +217,7 @@ namespace WpfUI.ViewModels
                 LogManager.Instance.LogError($"Failed to create test case: {ex.Message}");
                 MessageBox.Show($"Failed to create test case: {ex.Message}", "Error");
             }
+            return string.Empty;
         }
 
         public void DeleteSelectedItem()

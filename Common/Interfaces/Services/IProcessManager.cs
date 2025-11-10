@@ -37,8 +37,8 @@ namespace Common.Interfaces.Services
             IntPtr mutex,
             bool showConsoleMessages = false);
 
-        void CloseClient();
-        void CloseServer();
+        Task CloseClientAsync();
+        Task CloseServerAsync();
         #endregion
     }
 }

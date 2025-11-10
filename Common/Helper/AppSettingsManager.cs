@@ -91,6 +91,44 @@ namespace Common.Helper
             }
         }
         #endregion
+        public static bool UpdateAppSettings(string clientPath, int clientPort, string serverPath, int serverPort)
+        {
+            try
+            {
+                // Get or create appsettings.json for client
+                string clientAppSettings = AppSettingsPathResolver.GetAppSettingsPath(clientPath);
+                if (string.IsNullOrEmpty(clientAppSettings))
+                {
+                    LogManager.Instance.LogWarning("Client appsettings.json not found, creating default...");
+                }
+                else
+                {
+                    var clientManager = new AppSettingsManager(clientAppSettings);
+                    clientManager.UpdatePort(clientPort, createBackup: true);
+                    LogManager.Instance.LogInfomation($"✅ Client appsettings updated - Port: {clientPort}");
+                }
+
+                // Get or create appsettings.json for server
+                string serverAppSettings = AppSettingsPathResolver.GetAppSettingsPath(serverPath);
+                if (string.IsNullOrEmpty(serverAppSettings))
+                {
+                    LogManager.Instance.LogWarning("Server appsettings.json not found, creating default...");
+                }
+                else
+                {
+                    var serverManager = new AppSettingsManager(serverAppSettings);
+                    serverManager.UpdatePort(serverPort, createBackup: true);
+                    LogManager.Instance.LogInfomation($"✅ Server appsettings updated - Port: {serverPort}");
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                LogManager.Instance.LogError($"Failed to update appsettings: {ex.Message}");
+                return false;
+            }
+        }
 
 
         #region Backup & Restore

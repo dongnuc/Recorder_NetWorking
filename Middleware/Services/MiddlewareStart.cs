@@ -220,7 +220,7 @@ namespace Middleware.Services
                 // 3. Capture Response (Server → Client)
                 transaction.Response = new NetworkResponse
                 {
-                    StatusCode = ((int)responseMessage.StatusCode).ToString(),
+                    StatusCode = (responseMessage.StatusCode).ToString(),
                     Body = responseBody,
                     DataType = DataInspector.DetecDataType(responseBytes),
                     ByteSize = responseBytes.Length.ToString()

@@ -7,8 +7,9 @@
         mc:Ignorable="d"
         Title="RecorderWindow" Height="450" Width="800">
     <DockPanel>
+        <!-- ✅ Top Bar: Export + Process Controls -->
         <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="5">
-            <Button Content="📥 Export Data" 
+            <Button Content="📥 Save Data" 
                     Width="120" 
                     Margin="5,0,0,0" 
                     Click="BtnExportData_Click"
@@ -19,22 +20,25 @@
                     Padding="5"
                     ToolTip="Export all test data to JSON file"/>
 
-            <Button Content="🗑️ Delete Stage" 
+            <!-- Separator -->
+            <Separator Width="2" Background="LightGray" Margin="10,0"/>
+
+            <!-- ✅ Start/Close Client Buttons -->
+            <Button x:Name="BtnStartClient"
+                    Content="▶️ Start Client" 
                     Width="120" 
                     Margin="5,0,0,0" 
-                    Click="BtnDeleteStage_Click"
-                    Background="#E74C3C" 
+                    Click="BtnStartClient_Click"
+                    Background="#3498DB" 
                     Foreground="White"
                     BorderThickness="0" 
                     Cursor="Hand"
                     Padding="5"
-                    ToolTip="Delete the selected stage and all its data"/>
+                    ToolTip="Start the client process"
+                    Visibility="Visible"/>
 
-            <!-- Separator -->
-            <Separator Width="2" Background="LightGray" Margin="10,0"/>
-
-            <!-- Close Client Button -->
-            <Button Content="🔴 Close Client" 
+            <Button x:Name="BtnCloseClient"
+                    Content="🔴 Close Client" 
                     Width="120" 
                     Margin="5,0,0,0" 
                     Click="BtnCloseClient_Click"
@@ -43,10 +47,25 @@
                     BorderThickness="0" 
                     Cursor="Hand"
                     Padding="5"
-                    ToolTip="Stop and close the client process"/>
+                    ToolTip="Stop and close the client process"
+                    Visibility="Collapsed"/>
 
-            <!-- Close Server Button -->
-            <Button Content="🔴 Close Server" 
+            <!-- ✅ Start/Close Server Buttons -->
+            <Button x:Name="BtnStartServer"
+                    Content="▶️ Start Server" 
+                    Width="120" 
+                    Margin="5,0,0,0" 
+                    Click="BtnStartServer_Click"
+                    Background="#9B59B6" 
+                    Foreground="White"
+                    BorderThickness="0" 
+                    Cursor="Hand"
+                    Padding="5"
+                    ToolTip="Start the server process"
+                    Visibility="Visible"/>
+
+            <Button x:Name="BtnCloseServer"
+                    Content="🔴 Close Server" 
                     Width="120" 
                     Margin="5,0,0,0" 
                     Click="BtnCloseServer_Click"
@@ -55,9 +74,11 @@
                     BorderThickness="0" 
                     Cursor="Hand"
                     Padding="5"
-                    ToolTip="Stop and close the server process"/>
+                    ToolTip="Stop and close the server process"
+                    Visibility="Collapsed"/>
         </StackPanel>
 
+        <!-- ✅ Stage Selection + Delete Stage Button -->
         <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="5">
             <Label Content="Select Stage:" Margin="5,0,0,0" VerticalAlignment="Center" FontWeight="Bold"/>
             <ComboBox x:Name="cmbStages"
@@ -71,6 +92,19 @@
                 <Run Text="Total Stages: "/>
                 <Run Text="{Binding StageKeys.Count, Mode=OneWay}" FontWeight="Bold"/>
             </TextBlock>
+
+            <!-- ✅ Delete Stage Button - Moved Here -->
+            <Button Content="🗑️ Delete Stage" 
+                    Width="120" 
+                    Margin="20,0,0,0" 
+                    Click="BtnDeleteStage_Click"
+                    Background="#E74C3C" 
+                    Foreground="White"
+                    BorderThickness="0" 
+                    Cursor="Hand"
+                    Padding="5"
+                    VerticalAlignment="Center"
+                    ToolTip="Delete the selected stage and all its data"/>
         </StackPanel>
 
         <Grid Margin="5">
@@ -225,7 +259,6 @@
                         </Grid>
                     </TabItem>
 
-                    <!-- Output DB Tab - NEW -->
                     <TabItem Header="Output DB">
                         <Grid>
                             <Grid.RowDefinitions>
@@ -233,7 +266,6 @@
                                 <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
 
-                            <!-- Delete Button for Output DB -->
                             <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="5" HorizontalAlignment="Right">
                                 <Button Content="🗑️ Delete Selected" 
                                     Click="BtnDeleteOutputDB_Click"

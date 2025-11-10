@@ -1,5 +1,4 @@
-﻿// UITestKit/MainWindow.xaml.cs
-using Common.Helper;
+﻿using Common.Helper;
 using Common.Logging;
 using Microsoft.Win32;
 using Middleware.Services;
@@ -96,15 +95,15 @@ namespace WpfUI
 
                 // Start Middleware
                 TxtStatus.Text = "🌐 Starting middleware...";
-                await MiddlewareStart.Instance.StartAsync(proxyPort, serverPort, useHttp);
-                LogManager.Instance.LogInfomation($"✅ Middleware started - Protocol: {(useHttp ? "HTTP" : "TCP")}");
+                //await MiddlewareStart.Instance.StartAsync(proxyPort, serverPort, useHttp);
+                //LogManager.Instance.LogInfomation($"✅ Middleware started - Protocol: {(useHttp ? "HTTP" : "TCP")}");
 
                 // Create ProcessManager
                 var processManager = new ProcessManager();
 
                 // Create RecorderWindow (Đây là code gốc)
                 TxtStatus.Text = "🎙️ Opening recorder...";
-                var recorderWindow = new RecorderWindow(testCaseName, clientPath,serverPath);
+                //var recorderWindow = new RecorderWindow(testCaseName, clientPath,serverPath);
                 // var recorderWindow = new RecorderWindow(
                 //     testCaseName,
                 //     processManager,
@@ -115,8 +114,8 @@ namespace WpfUI
                 // --- KẾT THÚC SỬA ĐỔI ---
 
                 // var recorderWindow = new RecorderWindow(testCaseName, processManager);
-                recorderWindow.Title = $"Recording: {testCaseName}";
-                recorderWindow.Show();
+                //recorderWindow.Title = $"Recording: {testCaseName}";
+                //recorderWindow.Show();
 
 
                 TxtStatus.Text = "✅ Recording started successfully!";
