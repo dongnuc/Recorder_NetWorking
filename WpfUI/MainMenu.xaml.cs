@@ -1,7 +1,13 @@
-﻿using System;
+﻿using Common.Interfaces.IOFile;
+using FileManagement.FileHelper;
+using FileManagement.FileHelper.FileHandler;
+using Microsoft.Win32;
+using System;
+using System.ComponentModel; 
+using System.Diagnostics; 
 using System.Windows;
-using System.Windows.Controls; 
-using System.Windows.Media;    
+using System.Windows.Controls;
+using System.Windows.Media;
 using WpfUI.ViewModels;
 
 namespace WpfUI
@@ -9,13 +15,15 @@ namespace WpfUI
     public partial class MainMenu : Window
     {
         private MainMenuViewModel _viewModel;
+        private readonly IOFileManagement _fileManager;
 
         public MainMenu(MainMenuViewModel viewModel)
         {
             InitializeComponent();
-
             _viewModel = viewModel;
             this.DataContext = _viewModel;
+            IOFileHandler fileHandler = new ExcelExecution();
+            _fileManager = new FileManage(fileHandler);
         }
 
         private void FileTree_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
@@ -24,18 +32,18 @@ namespace WpfUI
             {
                 if (_viewModel != null) _viewModel.SelectedItem = selectedItem;
 
-                var fileDetailTextBlock = new TextBlock
+                try
                 {
-                    Text = $"Đã chọn file: {selectedItem.Name}\nĐường dẫn: {selectedItem.FullPath}",
-                    FontSize = 16,
-                    HorizontalAlignment = HorizontalAlignment.Left,
-                    VerticalAlignment = VerticalAlignment.Top,
-                    TextWrapping = TextWrapping.Wrap,
-                    Foreground = Brushes.Black, 
-                    Margin = new Thickness(10)
-                };
-
-                MainContentArea.Content = fileDetailTextBlock;
+                    _fileManager.OpenExcelFile(selectedItem.FullPath);
+                }
+                catch (Win32Exception ex)
+                {
+                    MessageBox.Show($"Không thể mở file. Máy của bạn không có chương trình nào được liên kết với file '.xlsx'.\n\nLỗi: {ex.Message}", "Lỗi Mở File", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Đã xảy ra lỗi khi mở file:\n{ex.Message}", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
             }
         }
 
@@ -53,6 +61,13 @@ namespace WpfUI
         private void BtnExit_Click(object sender, RoutedEventArgs e)
         {
             Application.Current.Shutdown();
+        }
+
+        private void BtnResetDb_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new ResetDbWindow();
+            dialog.Owner = this; 
+            dialog.ShowDialog(); 
         }
     }
 }

@@ -85,12 +85,15 @@ namespace WpfUI.Controls
 
         private void UpdateLogCount()
         {
-            TxtLogCount.Text = $"{_displayedLogs.Count} logs";
+            if (TxtLogCount != null)
+            {
+                TxtLogCount.Text = $"{_displayedLogs.Count} logs";
+            }
         }
 
         private void AutoScrollIfEnabled()
         {
-            if (ChkAutoScroll.IsChecked == true && LstLogs.Items.Count > 0)
+            if (ChkAutoScroll?.IsChecked == true && LstLogs?.Items.Count > 0)
             {
                 LstLogs.ScrollIntoView(LstLogs.Items[LstLogs.Items.Count - 1]);
             }
@@ -108,14 +111,17 @@ namespace WpfUI.Controls
             {
                 _displayedLogs.Clear();
                 LogManager.Instance.ClearLogs();
-                TxtStatus.Text = "✅ Logs cleared";
+                if (TxtStatus != null)
+                {
+                    TxtStatus.Text = "✅ Logs cleared";
+                }
                 UpdateLogCount();
             }
         }
 
         private void CmbLogLevel_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (CmbLogLevel.SelectedItem is ComboBoxItem selectedItem)
+            if (CmbLogLevel?.SelectedItem is ComboBoxItem selectedItem)
             {
                 string tag = selectedItem.Tag?.ToString();
 
@@ -135,7 +141,7 @@ namespace WpfUI.Controls
 
         private void TxtSearch_TextChanged(object sender, TextChangedEventArgs e)
         {
-            _searchKeyword = TxtSearch.Text;
+            _searchKeyword = TxtSearch?.Text ?? string.Empty;
             RefreshDisplay();
         }
 
