@@ -1,8 +1,10 @@
-﻿using System;
-using System.IO;
-using System.Windows;
-using Common.Logging;
+﻿using Common.Logging;
+using DatabaseServices.Services;
 using Microsoft.Win32; // <<< THÊM USING NÀY
+using System;
+using System.IO;
+using System.Threading.Tasks;
+using System.Windows;
 
 namespace WpfUI
 {
@@ -25,9 +27,11 @@ namespace WpfUI
             }
         }
 
-        private void BtnRunReset_Click(object sender, RoutedEventArgs e)
+        private async void BtnRunReset_Click(object sender, RoutedEventArgs e)
         {
             string selectedFilePath = TxtSqlFilePath.Text;
+
+            string connectionString = TxtConnectionString.Text;
 
             if (string.IsNullOrWhiteSpace(selectedFilePath))
             {
@@ -41,7 +45,10 @@ namespace WpfUI
                 return;
             }
 
-                LogManager.Instance.LogInfomation($"Executing SQL script: {selectedFilePath}");
+            var service = new ResetDatabaseService(connectionString);
+            await service.ResetDatabaseAsync(selectedFilePath);
+
+            LogManager.Instance.LogInfomation($"Executing SQL script: {selectedFilePath}");
                 MessageBox.Show($"Đã reset thành công", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
 
                 this.DialogResult = true;
