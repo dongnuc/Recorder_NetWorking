@@ -1,6 +1,6 @@
 namespace Common.Interfaces.Services
 {
-    public interface IResetDatabaseService
+    public interface IDatabaseServices
     {
         Task ResetDatabaseAsync(string sqlScriptPath);
     }

@@ -1,9 +1,9 @@
 using Common.Interfaces.Services;
 using Microsoft.Data.SqlClient;
 
-namespace Common.Services
+namespace DatabaseServices.Services
 {
-    public class ResetDatabaseService : IResetDatabaseService
+    public class ResetDatabaseService : IDatabaseServices
     {
         private readonly string _connectionString;
 
