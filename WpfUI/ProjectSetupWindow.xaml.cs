@@ -1,4 +1,5 @@
 ﻿using Common.Interfaces.IOFile;
+using Common.Interfaces.Services;
 using Common.Logging;
 using FileManagement.FileHelper.FileHandler;
 using FileManagement.FolderHelper;
@@ -16,13 +17,18 @@ namespace WpfUI
     {
         private readonly IOFolderHandler _folderHandler;
         private readonly IOFileHandler _fileHandler;
-
-        public ProjectSetupWindow()
+        private readonly IServiceProvider _serviceProvider;
+        private readonly IOFileManagement _fileManagement;
+        public ProjectSetupWindow(IOFileHandler fileHandler,
+        IServiceProvider serviceProvider,
+        IOFileManagement fileManagement)
         {
             InitializeComponent();
             ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
             _folderHandler = new FolderHandler();
             _fileHandler = new ExcelExecution();
+            _serviceProvider = serviceProvider;
+            _fileManagement = fileManagement;
             LogManager.Instance.LogInfomation("🚀 ProjectSetupWindow opened");
 
             LoadSettings();
@@ -61,15 +67,6 @@ namespace WpfUI
             {
                 string basePath = TxtProjectLocation.Text;
                 string projectName = TxtProjectName.Text;
-                bool useHttp = RbHttp.IsChecked == true;
-                string templateDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources", "Templates");
-
-                if (!Directory.Exists(templateDir) ||
-                    !File.Exists(Path.Combine(templateDir, "header.xlsx")) ||
-                    !File.Exists(Path.Combine(templateDir, "environment.xlsx")))
-                {
-                    throw new Exception("Template folder or files ('header.xlsx', 'environment.xlsx') not found. \nPlease check 'Resources/Templates' and set 'Copy to Output Directory'.");
-                }
 
                 string projectRoot = _folderHandler.CreateDirectory(basePath, projectName);
                 LogManager.Instance.LogInfomation($"Project root created at: {projectRoot}");
@@ -85,7 +82,7 @@ namespace WpfUI
                     _fileHandler,
                     projectRoot
                 );
-                var mainMenu = new MainMenu(mainViewModel);
+                var mainMenu = new MainMenu(mainViewModel,_fileHandler,_serviceProvider,_fileManagement);
                 mainMenu.Show();
 
                 this.Close();

@@ -1,6 +1,6 @@
 ﻿namespace Common.Models.Entities
 {
-    public class OutputDB
+    public class Database
     {
         public int Stage { get; set; }
         public string Query { get; set; } = string.Empty;

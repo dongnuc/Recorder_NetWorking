@@ -41,17 +41,11 @@ namespace WpfUI.ViewModels
         public MainMenuViewModel(
             IOFolderHandler folderHandler,
             IOFileHandler fileHandler,
-            string projectPath,
-            string clientExePath,
-            string serverExePath,
-            bool isHttp)
+            string projectPath)
         {
             _folderHandler = folderHandler;
             _fileHandler = fileHandler;
             _projectPath = projectPath;
-            _clientExePath = clientExePath;
-            _serverExePath = serverExePath;
-            _isHtpp = isHttp;
             RootItems = new ObservableCollection<FileSystemItemViewModel>();
             LoadFileTree();
         }
@@ -141,18 +135,18 @@ namespace WpfUI.ViewModels
             }
         }
 
-        public async void CreateNewTestCase(string testCaseName)
+        public async Task<string> CreateNewTestCase(string testCaseName)
         {
-            if (string.IsNullOrWhiteSpace(testCaseName)) { MessageBox.Show("Test case name cannot be empty.", "Warning"); return; }
+            if (string.IsNullOrWhiteSpace(testCaseName)) { MessageBox.Show("Test case name cannot be empty.", "Warning"); return string.Empty; }
             if (SelectedItem == null || !SelectedItem.IsFolder)
             {
                 MessageBox.Show("Please select a parent 'Question' folder first.", "Warning");
-                return;
+                return string.Empty;
             }
             if (SelectedItem.FullPath.Equals(_projectPath, StringComparison.OrdinalIgnoreCase))
             {
                 MessageBox.Show("Cannot create a TestCase directly in the root. Please select a 'Question' folder.", "Warning");
-                return;
+                return string.Empty;
             }
 
             try
@@ -210,6 +204,7 @@ namespace WpfUI.ViewModels
                     LogManager.Instance.LogWarning($"Could not append TestCase to Header.xlsx. Error: {ex.Message}");
                 }
                 LoadFileTree();
+                return testCasePath;
                 LogManager.Instance.LogInfomation($"Created new test case: {testCaseName}. UseDatabase={useDatabase}");
             }
             catch (Exception ex)

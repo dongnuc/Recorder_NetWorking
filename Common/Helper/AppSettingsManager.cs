@@ -32,7 +32,20 @@ namespace Common.Helper
         #endregion
 
         #region Update Port
-
+        private bool IsFileLocked(string filePath)
+        {
+            try
+            {
+                using (FileStream stream = File.Open(filePath, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+                {
+                    return false;
+                }
+            }
+            catch (IOException)
+            {
+                return true;
+            }
+        }
         /// <summary>
         /// Update the Port value in appsettings.json
         /// </summary>
@@ -43,6 +56,12 @@ namespace Common.Helper
         {
             try
             {
+                if (IsFileLocked(_filePath))
+                {
+                    LogManager.Instance.LogError($"   File is locked: {_filePath}");
+                    LogManager.Instance.LogError($"   Close any applications using this file");
+                    return false;
+                }
                 // Validate port
                 if (newPort < 1 || newPort > 65535)
                 {
@@ -81,7 +100,7 @@ namespace Common.Helper
                 string updatedJson = jsonNode.ToJsonString(_jsonOptions);
                 File.WriteAllText(_filePath, updatedJson);
 
-                LogManager.Instance.LogInfomation($"✅ Updated Port to {newPort} in {Path.GetFileName(_filePath)}");
+                LogManager.Instance.LogInfomation($"Updated Port to {newPort} in {Path.GetFileName(_filePath)}");
                 return true;
             }
             catch (Exception ex)
@@ -105,7 +124,7 @@ namespace Common.Helper
                 {
                     var clientManager = new AppSettingsManager(clientAppSettings);
                     clientManager.UpdatePort(clientPort, createBackup: true);
-                    LogManager.Instance.LogInfomation($"✅ Client appsettings updated - Port: {clientPort}");
+                    LogManager.Instance.LogInfomation($" Client appsettings updated - Port: {clientPort}");
                 }
 
                 // Get or create appsettings.json for server

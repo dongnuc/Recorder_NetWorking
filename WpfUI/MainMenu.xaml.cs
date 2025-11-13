@@ -1,9 +1,14 @@
 ﻿using Common.Interfaces.IOFile;
+using Common.Interfaces.Services;
 using Common.Logging;
-using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Media;
+using System.Windows.Input;
+using WpfUI.Dialogs;
+using WpfUI.Properties;
+using WpfUI.Services;
 using WpfUI.ViewModels;
 
 namespace WpfUI
@@ -23,11 +28,19 @@ namespace WpfUI
         private readonly IOFileManagement _fileManager;
 
         private Dictionary<Guid, TabItemData> _activeTabs = new Dictionary<Guid, TabItemData>();
-        public MainMenu(MainMenuViewModel viewModel)
+        private IOFileHandler _fileHandler;
+        private readonly IServiceProvider _serviceProvider;
+        public MainMenu(MainMenuViewModel viewModel,
+            IOFileHandler fileHandler,
+            IServiceProvider serviceProvider,
+            IOFileManagement fileManager)
         {
             InitializeComponent();
             _viewModel = viewModel;
             this.DataContext = _viewModel;
+            _fileHandler = fileHandler;
+            _serviceProvider = serviceProvider;
+            _fileManager = fileManager;
         }
 
         private void FileTree_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
@@ -42,7 +55,7 @@ namespace WpfUI
                     {
                         _fileManager.OpenExcelFile(selectedItem.FullPath);
                     }
-                    catch (Win32Exception ex)
+                    catch (System.ComponentModel.Win32Exception ex)
                     {
                         MessageBox.Show($"Không thể mở file. Máy của bạn không có chương trình nào được liên kết với file '.xlsx'.\n\nLỗi: {ex.Message}",
                             "Lỗi Mở File", MessageBoxButton.OK, MessageBoxImage.Error);
@@ -134,12 +147,22 @@ namespace WpfUI
             var dialog = new InputBoxWindow("Enter new test case name:", $"TestCase_{DateTime.Now:yyyyMMdd_HHmmss}");
             dialog.Owner = this;
 
+            string clientPath = Settings.Default.ClientExePath;
+            string serverPath = Settings.Default.ServerExePath;
+            if (string.IsNullOrEmpty(clientPath) || string.IsNullOrEmpty(serverPath))
+            {
+                MessageBox.Show("Hãy cấu hình trước khi tạo testcase", "Warning");
+                return;
+            }
+
             if (dialog.ShowDialog() == true)
             {
-                var testcasePath = _viewModel?.CreateNewTestCase(dialog.InputText);
-                var testcaseName = dialog.InputText.ToString();
+                string testcaseName = dialog.InputText.Trim();
+                var pathTestCase = await _viewModel?.CreateNewTestCase(dialog.InputText);
                 LogManager.Instance.LogInfomation(dialog.InputText.ToString());
-               await CreateRecorderTab(testcasePath,testcaseName, _viewModel._clientExePath, _viewModel._serverExePath,_viewModel._isHtpp);
+                string testcasePath = pathTestCase;
+                bool isHttp = Settings.Default.Protocol == "HTTP";
+               await CreateRecorderTab(testcasePath,testcaseName, clientPath, serverPath,isHttp);
             }
         }
 
@@ -190,10 +213,17 @@ namespace WpfUI
         #region recorder tab
         private async Task CreateRecorderTab(string testcasePath, string testcaseName,string clientPath,string serverPath,bool isHttp)
         {
+            RecorderWindowScope scope = null;
             try
             {
                 Guid tabId = Guid.NewGuid();
-                var recorderWindow = new RecorderWindow(testcasePath,testcaseName, clientPath, serverPath,isHttp);
+
+                scope = new RecorderWindowScope(_serviceProvider);
+                var processManager = scope.ServiceProvider.GetRequiredService<IProcessManager>();
+                var testkitManagerSerive = scope.ServiceProvider.GetRequiredService<ITestkitManagerService>();
+                var recorderWindow = new RecorderWindow(testcasePath,testcaseName, clientPath,
+                    serverPath,isHttp,
+                    processManager, _fileHandler, testkitManagerSerive);
 
                 var windowContent = recorderWindow.Content as FrameworkElement;
                 recorderWindow.Content = null;
@@ -219,6 +249,12 @@ namespace WpfUI
                 };
 
                 _activeTabs[tabId] = tabData;
+
+                if (_activeTabs.Count == 1)
+                {
+                    WelcomeTab.Visibility = Visibility.Collapsed;
+                }
+
                 TestCaseTabControl.Items.Add(tabItem);
                 TestCaseTabControl.SelectedItem = tabItem;
                 await recorderWindow.InitializeAsync();
@@ -256,7 +292,7 @@ namespace WpfUI
                 if (_activeTabs.TryGetValue(id, out var tabData))
                 {
                     LogManager.Instance?.LogInfomation($" Closing tab: {tabData.TestCaseName} (ID: {id})");
-
+                    await tabData.RecorderWindow.CleanupAsync();
                     if (tabData.RecorderWindow != null)
                     {
                         try
@@ -271,11 +307,18 @@ namespace WpfUI
                         }
                     }
 
+
                     // Remove from UI
                     TestCaseTabControl.Items.Remove(tabData.TabItem);
 
                     // Remove from dictionary
                     _activeTabs.Remove(id);
+
+                    if (_activeTabs.Count == 0)
+                    {
+                        WelcomeTab.Visibility = Visibility.Visible;
+                        TestCaseTabControl.SelectedItem = WelcomeTab;
+                    }
 
                     LogManager.Instance?.LogInfomation($" Tab closed successfully: {tabData.TestCaseName}");
                 }

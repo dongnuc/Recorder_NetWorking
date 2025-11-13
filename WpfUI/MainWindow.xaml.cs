@@ -99,7 +99,7 @@ namespace WpfUI
                 //LogManager.Instance.LogInfomation($"✅ Middleware started - Protocol: {(useHttp ? "HTTP" : "TCP")}");
 
                 // Create ProcessManager
-                var processManager = new ProcessManager();
+                //var processManager = new ProcessManager();
 
                 // Create RecorderWindow (Đây là code gốc)
                 TxtStatus.Text = "🎙️ Opening recorder...";

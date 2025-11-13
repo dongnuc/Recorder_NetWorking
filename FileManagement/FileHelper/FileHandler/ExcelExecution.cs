@@ -54,15 +54,15 @@ namespace FileManagement.FileHelper.FileHandler
 
                     // --- 2. Ghi tiêu đề "InputClient" ---
                     var inputClientSheet = package.Workbook.Worksheets["InputClient"];
-                    WriteHeaders(inputClientSheet, 1, typeof(InputClient));
+                    WriteHeaders(inputClientSheet, 1, typeof(User));
 
                     // --- 3. Ghi tiêu đề "OutputClient" ---
                     var outputClientSheet = package.Workbook.Worksheets["OutputClient"];
-                    WriteHeaders(outputClientSheet, 1, typeof(OutputClient));
+                    WriteHeaders(outputClientSheet, 1, typeof(Client));
 
                     // --- 4. Ghi tiêu đề "OutputServer" ---
                     var outputServerSheet = package.Workbook.Worksheets["OutputServer"];
-                    WriteHeaders(outputServerSheet, 1, typeof(OutputServer));
+                    WriteHeaders(outputServerSheet, 1, typeof(Server));
 
                     package.Save();
                 }
@@ -90,9 +90,9 @@ namespace FileManagement.FileHelper.FileHandler
 
         private string GetSheetNameForType(Type type)
         {
-            if (type == typeof(InputClient)) return "InputClient";
-            if (type == typeof(OutputClient)) return "OutputClient";
-            if (type == typeof(OutputServer)) return "OutputServer";
+            if (type == typeof(User)) return "InputClient";
+            if (type == typeof(Client)) return "OutputClient";
+            if (type == typeof(Server)) return "OutputServer";
 
             return "Config";
         }
