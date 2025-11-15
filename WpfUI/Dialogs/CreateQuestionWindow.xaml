@@ -1,0 +1,34 @@
+﻿<Window x:Class="WpfUI.CreateQuestionWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Create New Question" Height="280" Width="450"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize" Background="#F0F0F0">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <Label Grid.Row="0" Content="New Question Name:" FontWeight="SemiBold"/>
+        <TextBox Grid.Row="1" x:Name="TxtQuestionName" Height="30" VerticalContentAlignment="Center" Margin="0,5,0,0"/>
+
+        <GroupBox Grid.Row="2" Header="Use Database?" Margin="0,15,0,0">
+            <StackPanel Orientation="Horizontal">
+                <RadioButton x:Name="RbDbYes" Content="Yes" IsChecked="True" Margin="10,0,20,0" VerticalAlignment="Center"/>
+                <RadioButton x:Name="RbDbNo" Content="No" VerticalAlignment="Center"/>
+            </StackPanel>
+        </GroupBox>
+
+        <Button Grid.Row="3"
+                x:Name="BtnCreate"
+                Content="Create"
+                Height="40" Width="120"
+                FontSize="14" FontWeight="Bold"
+                Background="#27AE60" Foreground="White"
+                BorderThickness="0" Cursor="Hand"
+                Click="BtnCreate_Click" 
+                VerticalAlignment="Bottom" HorizontalAlignment="Right"/>
+    </Grid>
+</Window>

@@ -11,8 +11,63 @@
         WindowStartupLocation="CenterScreen"
         Background="#F0F0F0">
 
-    <DockPanel>
+    <Window.Resources>
+        <ContextMenu x:Key="TreeViewItemContextMenu">
+            <MenuItem Tag="CreateQuestion"
+                      Header="Create Question..."
+                      Click="CmCreateQuestion_Click"
+                      FontWeight="Bold"
+                      Visibility="Collapsed"/>
+            <MenuItem Tag="DeleteQuestion"
+                      Header="Delete Question"
+                      Click="CmDelete_Click"
+                      Visibility="Collapsed"/>
+            <Separator Tag="Sep1" Visibility="Collapsed"/>
+            <MenuItem Tag="CreateTestCase"
+                      Header="Create TestCase..."
+                      Click="CmCreateTestCase_Click"
+                      FontWeight="Bold"
+                      Visibility="Collapsed"/>
+            <MenuItem Tag="DeleteTestCase"
+                      Header="Delete TestCase"
+                      Click="CmDelete_Click"
+                      Visibility="Collapsed"/>
+        </ContextMenu>
 
+        <Style x:Key="TreeViewToggleButton" TargetType="ToggleButton">
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Width" Value="16"/>
+            <Setter Property="Height" Value="16"/>
+            <Setter Property="Margin" Value="0,0,4,0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border Background="Transparent" Width="16" Height="16" SnapsToDevicePixels="True">
+                            <Path x:Name="Arrow" 
+                                  Stroke="#606060" 
+                                  StrokeThickness="1.5"
+                                  HorizontalAlignment="Center" 
+                                  VerticalAlignment="Center"
+                                  Data="M 5 3 L 10 8 L 5 13" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Arrow" Property="Data" Value="M 3 5 L 8 10 L 13 5" />
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Arrow" Property="Stroke" Value="#0078D7"/>
+                            </Trigger>
+                            <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=TreeViewItem}}" Value="True">
+                                <Setter TargetName="Arrow" Property="Stroke" Value="White"/>
+                            </DataTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <DockPanel>
         <Menu DockPanel.Dock="Top" Background="WhiteSmoke" BorderBrush="#DDD" BorderThickness="0,0,0,1">
             <MenuItem Header="_File" Padding="10,5">
                 <MenuItem Header="_New Test Case..." Click="BtnCreateTestCase_Click"/>
@@ -26,11 +81,18 @@
 
         <Border DockPanel.Dock="Top" Background="#2C3E50" Padding="10">
             <WrapPanel Orientation="Horizontal">
-
-                
-
                 <Separator Width="1" Background="#526D8B" Margin="5,0"/>
+                <Button Content="⚙️ Config" 
+                    ToolTip="Cấu hình Executables và Protocol" 
+                    Padding="8,4" Margin="0,0,5,0"
+                    Background="#3498DB" 
+                    Foreground="White" 
+                    BorderThickness="0" 
+                    Cursor="Hand"
+                    FontWeight="SemiBold"
+                    Click="BtnConfig_Click"/>
 
+                <TextBlock Text="|" Foreground="#526D8B" VerticalAlignment="Center" Margin="5,0"/>
                 <Button Content="🔄 Reset DB" 
                         ToolTip="Reset DB" 
                         Padding="8,4" Margin="0,0,5,0"
@@ -40,13 +102,7 @@
                         Cursor="Hand"
                         FontWeight="SemiBold"
                         Click="BtnResetDb_Click"/>
-
                 <TextBlock Text="|" Foreground="#526D8B" VerticalAlignment="Center" Margin="5,0"/>
-
-                
-
-                
-
             </WrapPanel>
         </Border>
 
@@ -62,38 +118,88 @@
                     <TreeView x:Name="FileTree" 
                               ItemsSource="{Binding RootItems}"
                               SelectedItemChanged="FileTree_SelectedItemChanged"
-                              Margin="5" Background="Transparent" BorderThickness="0">
+                              Margin="5" Background="Transparent" BorderThickness="0"
+                              ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+
                         <TreeView.Resources>
-                            <Style TargetType="TreeViewItem">
-                                <Setter Property="Padding" Value="5,3"/>
-                                <Setter Property="Margin" Value="0,1"/>
-                                <Setter Property="BorderThickness" Value="1"/>
-                                <Style.Triggers>
-                                    <Trigger Property="IsSelected" Value="True">
-                                        <Setter Property="Background" Value="#3898FA"/>
-                                        <Setter Property="Foreground" Value="White"/>
-                                        <Setter Property="BorderBrush" Value="#3898FA"/>
-                                        <Setter Property="FontWeight" Value="SemiBold"/>
-                                    </Trigger>
-                                    <Trigger Property="IsSelected" Value="False">
-                                        <Setter Property="Background" Value="Transparent"/>
-                                        <Setter Property="Foreground" Value="Black"/>
-                                        <Setter Property="BorderBrush" Value="Transparent"/>
-                                    </Trigger>
-                                    <Trigger Property="IsMouseOver" Value="True">
-                                        <Setter Property="Background" Value="#E0E0E0"/>
-                                        <Setter Property="Foreground" Value="Black"/>
-                                        <Setter Property="BorderBrush" Value="#E0E0E0"/>
-                                    </Trigger>
-                                </Style.Triggers>
-                            </Style>
+
                             <HierarchicalDataTemplate DataType="{x:Type vm:FileSystemItemViewModel}" ItemsSource="{Binding Children}">
                                 <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="{Binding IsFolder, Converter={StaticResource FolderToIconConverter}}" FontFamily="Segoe MDL2 Assets" VerticalAlignment="Center" Margin="0,0,5,0" FontSize="14"/>
-                                    <TextBlock Text="{Binding Name}" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding IsFolder, Converter={StaticResource FolderToIconConverter}}" 
+                                               FontFamily="Segoe MDL2 Assets" 
+                                               VerticalAlignment="Center" Margin="0,0,5,0" FontSize="14"
+                                               Foreground="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=TreeViewItem}}"/>
+                                    <TextBlock Text="{Binding Name}" 
+                                               VerticalAlignment="Center"
+                                               Foreground="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=TreeViewItem}}"/>
                                 </StackPanel>
                             </HierarchicalDataTemplate>
+
+                            <Style TargetType="TreeViewItem">
+                                <Setter Property="ContextMenu" Value="{StaticResource TreeViewItemContextMenu}"/>
+                                <EventSetter Event="ContextMenuOpening" Handler="TreeViewItem_ContextMenuOpening"/>
+                                <EventSetter Event="PreviewMouseRightButtonDown" Handler="TreeViewItem_PreviewMouseRightButtonDown"/>
+                                <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                                <Setter Property="Foreground" Value="Black"/>
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Setter Property="BorderBrush" Value="Transparent"/>
+                                <Setter Property="Padding" Value="5,3"/>
+                                <Setter Property="Margin" Value="0,1"/>
+
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="TreeViewItem">
+                                            <StackPanel>
+                                                <Border x:Name="Bd"
+                                                        CornerRadius="4" 
+                                                        Background="{TemplateBinding Background}"
+                                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                                        BorderThickness="{TemplateBinding BorderThickness}"
+                                                        Padding="{TemplateBinding Padding}"
+                                                        SnapsToDevicePixels="true">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <ToggleButton x:Name="Expander" 
+                                                                      Style="{StaticResource TreeViewToggleButton}"
+                                                                      IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}}" 
+                                                                      ClickMode="Press"/>
+                                                        <ContentPresenter x:Name="PART_Header" 
+                                                                          ContentSource="Header" 
+                                                                          VerticalAlignment="Center"/>
+                                                    </StackPanel>
+                                                </Border>
+
+                                                <ItemsPresenter x:Name="ItemsHost"
+                                                                Margin="25,0,0,0" Visibility="Collapsed"/>
+                                            </StackPanel>
+
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsExpanded" Value="True">
+                                                    <Setter TargetName="ItemsHost" Property="Visibility" Value="Visible"/>
+                                                </Trigger>
+                                                <Trigger Property="HasItems" Value="False">
+                                                    <Setter TargetName="Expander" Property="Visibility" Value="Hidden"/>
+                                                </Trigger>
+
+                                                <Trigger Property="IsSelected" Value="True">
+                                                    <Setter TargetName="Bd" Property="Background" Value="#3898FA"/>
+                                                    <Setter Property="Foreground" Value="White"/>
+                                                </Trigger>
+                                                <MultiTrigger>
+                                                    <MultiTrigger.Conditions>
+                                                        <Condition Property="IsMouseOver" Value="True" />
+                                                        <Condition Property="IsSelected" Value="False" />
+                                                    </MultiTrigger.Conditions>
+                                                    <Setter TargetName="Bd" Property="Background" Value="#F0F0F0"/>
+                                                    <Setter Property="Foreground" Value="Black"/>
+                                                </MultiTrigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+
                         </TreeView.Resources>
+
                     </TreeView>
                 </GroupBox>
             </Grid>
@@ -110,9 +216,7 @@
                                 <RowDefinition Height="250"/>
                             </Grid.RowDefinitions>
 
-                            <StackPanel Grid.Row="0" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                
-                            </StackPanel>
+                            <StackPanel Grid.Row="0" HorizontalAlignment="Center" VerticalAlignment="Center"/>
 
                             <GridSplitter Grid.Row="1" Height="5" HorizontalAlignment="Stretch" VerticalAlignment="Center" Background="LightGray" ResizeBehavior="PreviousAndNext"/>
 
