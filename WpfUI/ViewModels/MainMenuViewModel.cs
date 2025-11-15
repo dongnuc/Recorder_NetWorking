@@ -1,12 +1,12 @@
 ﻿using Common.Interfaces.IOFile;
 using Common.Logging;
+using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Windows;
-using System;
-using WpfUI.Properties; 
+using WpfUI.Properties; // Cần thiết để đọc Settings.Default
 
 namespace WpfUI.ViewModels
 {
@@ -16,35 +16,46 @@ namespace WpfUI.ViewModels
         private readonly IOFolderHandler _folderHandler;
         private readonly IOFileHandler _fileHandler;
         private readonly string _projectPath;
+
+        // Giữ lại các biến này, nhưng load chúng từ Settings
         private readonly string _clientExePath;
         private readonly string _serverExePath;
 
-        private readonly string _templateDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
+        private readonly string _testCaseTemplateDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
                                                 "Resources", "Templates", "DotnetNetworking", "TestCase");
+        private readonly string _questionTemplateDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
+                                                "Resources", "Templates", "DotnetNetworking", "Question");
         #endregion
 
         #region Properties
         public ObservableCollection<FileSystemItemViewModel> RootItems { get; set; }
-        public FileSystemItemViewModel SelectedItem { get; set; }
+
+        private FileSystemItemViewModel _selectedItem;
+        public FileSystemItemViewModel SelectedItem
+        {
+            get => _selectedItem;
+            set { _selectedItem = value; OnPropertyChanged(); }
+        }
         #endregion
 
         public MainMenuViewModel(
             IOFolderHandler folderHandler,
             IOFileHandler fileHandler,
-            string projectPath,
-            string clientExePath,
-            string serverExePath)
+            string projectPath)
         {
             _folderHandler = folderHandler;
             _fileHandler = fileHandler;
             _projectPath = projectPath;
-            _clientExePath = clientExePath;
-            _serverExePath = serverExePath;
+
+            _clientExePath = Settings.Default.ClientExePath;
+            _serverExePath = Settings.Default.ServerExePath;
+
             RootItems = new ObservableCollection<FileSystemItemViewModel>();
             LoadFileTree();
         }
 
         #region File/Folder Tree Logic
+
 
         public void LoadFileTree()
         {
@@ -85,22 +96,94 @@ namespace WpfUI.ViewModels
             catch (Exception ex) { LogManager.Instance.LogWarning($"Could not access path: {parentNode.FullPath}. Error: {ex.Message}"); }
         }
 
-        public void CreateNewTestCase(string testCaseName)
+        public void CreateNewQuestion(string questionName, bool useDatabase)
         {
-            if (string.IsNullOrWhiteSpace(testCaseName)) { MessageBox.Show("Test case name cannot be empty.", "Warning"); return; }
+            if (string.IsNullOrWhiteSpace(questionName))
+            {
+                MessageBox.Show("Question name cannot be empty.", "Warning");
+                return;
+            }
+            if (SelectedItem == null || !SelectedItem.FullPath.Equals(_projectPath, StringComparison.OrdinalIgnoreCase))
+            {
+                MessageBox.Show("Please select the root project folder to create a new Question.", "Warning");
+                return;
+            }
 
             try
             {
-                string testCasePath = _folderHandler.CreateDirectory(_projectPath, testCaseName);
+                string questionPath = _folderHandler.CreateDirectory(SelectedItem.FullPath, questionName);
 
-                _folderHandler.CopyTemplateFromResource(testCasePath, _templateDir, false,
-                    "Header.xlsx", "Environment.xlsx", "Detail.xlsx");
-
-                bool useDatabase = Settings.Default.UseDatabase;
+                _folderHandler.CopyTemplateFromResource(questionPath, _questionTemplateDir, false,
+                    "Header.xlsx", "Environment.xlsx");
 
                 string chosenEnvRunFile = useDatabase ? "EnvRunDB.xlsx" : "EnvRunNoDB.xlsx";
-                string srcSheetPath = Path.Combine(_templateDir, chosenEnvRunFile);
+                string srcSheetPath = Path.Combine(_questionTemplateDir, chosenEnvRunFile);
+                string destEnvPath = Path.Combine(questionPath, "Environment.xlsx");
 
+                if (!File.Exists(srcSheetPath))
+                {
+                    throw new Exception($"Template file {chosenEnvRunFile} not found in '.../Templates/DotnetNetworking/Question'. \nPlease check 'Copy to Output Directory'.");
+                }
+
+                _folderHandler.ReplaceSheetExcel(srcSheetPath, destEnvPath);
+
+                _folderHandler.CreateDirectory(questionPath, "Meta");
+
+                LoadFileTree();
+                LogManager.Instance.LogInfomation($"Created new question: {questionName}. UseDatabase={useDatabase}");
+            }
+            catch (Exception ex)
+            {
+                LogManager.Instance.LogError($"Failed to create question: {ex.Message}");
+                MessageBox.Show($"Failed to create question: {ex.Message}", "Error");
+            }
+        }
+
+        public async void CreateNewTestCase(string testCaseName)
+        {
+            if (string.IsNullOrWhiteSpace(testCaseName)) { MessageBox.Show("Test case name cannot be empty.", "Warning"); return; }
+            if (SelectedItem == null || !SelectedItem.IsFolder)
+            {
+                MessageBox.Show("Please select a parent 'Question' folder first.", "Warning");
+                return;
+            }
+            if (SelectedItem.FullPath.Equals(_projectPath, StringComparison.OrdinalIgnoreCase))
+            {
+                MessageBox.Show("Cannot create a TestCase directly in the root. Please select a 'Question' folder.", "Warning");
+                return;
+            }
+
+            try
+            {
+                string testCasePath = _folderHandler.CreateDirectory(SelectedItem.FullPath, testCaseName);
+
+                _folderHandler.CopyTemplateFromResource(testCasePath, _testCaseTemplateDir, false,
+                    "Header.xlsx", "Environment.xlsx", "Detail.xlsx");
+
+                bool useDatabase = false;
+                try
+                {
+                    string parentEnvPath = Path.Combine(SelectedItem.FullPath, "Environment.xlsx");
+
+                    string indicator = _fileHandler.GetCellValue(parentEnvPath, "Run", 1, 1);
+
+                    if (indicator != null && indicator.Equals("DATABASE_MODE", StringComparison.OrdinalIgnoreCase))
+                    {
+                        useDatabase = true;
+                        LogManager.Instance.LogInfomation($"Inherited UseDatabase=true from parent '{SelectedItem.Name}'");
+                    }
+                    else
+                    {
+                        LogManager.Instance.LogInfomation($"Inherited UseDatabase=false from parent '{SelectedItem.Name}'");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    LogManager.Instance.LogError($"Could not determine DB setting from parent. Defaulting to false. Error: {ex.Message}");
+                }
+
+                string chosenEnvRunFile = useDatabase ? "EnvRunDB.xlsx" : "EnvRunNoDB.xlsx";
+                string srcSheetPath = Path.Combine(_testCaseTemplateDir, chosenEnvRunFile);
                 string destEnvPath = Path.Combine(testCasePath, "Environment.xlsx");
 
                 if (!File.Exists(srcSheetPath))
@@ -109,9 +192,23 @@ namespace WpfUI.ViewModels
                 }
 
                 _folderHandler.ReplaceSheetExcel(srcSheetPath, destEnvPath);
+                _folderHandler.CreateDirectory(testCasePath, "Meta");
+                try
+                {
+                    string parentHeaderPath = Path.Combine(SelectedItem.FullPath, "Header.xlsx");
 
+                    LogManager.Instance.LogInfomation($"Appending '{testCaseName}' to Header file: {parentHeaderPath}...");
+                    
+                    await _fileHandler.AppendNewRow(parentHeaderPath, "TestSuite", testCaseName, string.Empty);
+
+                    await _fileHandler.AppendNewRow(parentHeaderPath, "QuestionMark", testCaseName, string.Empty);
+                }
+                catch (Exception ex)
+                {
+                    LogManager.Instance.LogWarning($"Could not append TestCase to Header.xlsx. Error: {ex.Message}");
+                }
                 LoadFileTree();
-                LogManager.Instance.LogInfomation($"✅ Created new test case: {testCaseName}. UseDatabase={useDatabase}");
+                LogManager.Instance.LogInfomation($"Created new test case: {testCaseName}. UseDatabase={useDatabase}");
             }
             catch (Exception ex)
             {
@@ -119,6 +216,39 @@ namespace WpfUI.ViewModels
                 MessageBox.Show($"Failed to create test case: {ex.Message}", "Error");
             }
         }
+
+        public void DeleteSelectedItem()
+        {
+            if (SelectedItem == null) return;
+
+            if (SelectedItem.FullPath.Equals(_projectPath, StringComparison.OrdinalIgnoreCase))
+            {
+                MessageBox.Show("Cannot delete the root project folder.", "Warning");
+                return;
+            }
+
+            var result = MessageBox.Show(
+                $"Are you sure you want to permanently delete:\n{SelectedItem.Name}?",
+                "Confirm Delete",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+
+            if (result == MessageBoxResult.Yes)
+            {
+                try
+                {
+                    _folderHandler.DeleteFileOrFolder(SelectedItem.FullPath);
+                    LogManager.Instance.LogInfomation($"Deleted: {SelectedItem.Name}");
+                    LoadFileTree();
+                }
+                catch (Exception ex)
+                {
+                    LogManager.Instance.LogError($"Failed to delete: {ex.Message}");
+                    MessageBox.Show($"Failed to delete: {ex.Message}", "Error");
+                }
+            }
+        }
+
         #endregion
 
         #region INotifyPropertyChanged

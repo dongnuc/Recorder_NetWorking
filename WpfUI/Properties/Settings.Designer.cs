@@ -70,5 +70,17 @@ namespace WpfUI.Properties {
                 this["UseDatabase"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string Protocol {
+            get {
+                return ((string)(this["Protocol"]));
+            }
+            set {
+                this["Protocol"] = value;
+            }
+        }
     }
 }

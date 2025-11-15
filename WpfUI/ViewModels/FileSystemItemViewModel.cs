@@ -2,7 +2,7 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
-namespace WpfUI.ViewModels // <<< Namespace rất quan trọng
+namespace WpfUI.ViewModels 
 {
     public class FileSystemItemViewModel : INotifyPropertyChanged
     {
