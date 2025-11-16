@@ -6,8 +6,6 @@ using Common.Interfaces.Services;
 using Common.Logging;
 using Common.Resources;
 using System.Collections.Concurrent;
-using System.Diagnostics;
-using System.Xml.Linq;
 
 namespace ProcessManagement.Services
 {
@@ -218,7 +216,7 @@ namespace ProcessManagement.Services
                         // Check Enter key state 0x0D => enter | 0x7B => F12
                         bool currentEnterState = _keyListener.IsKeyPressed(Constants.VK_F12);
 
-                        // Check F10 key for snapshot only
+                        // Check F10 key for snapshot only to update current snapshot
                         bool currentF10State = _keyListener.IsKeyPressed(Constants.VK_F10);
 
 
@@ -236,16 +234,16 @@ namespace ProcessManagement.Services
                             }
                         }
 
-                        if (currentF10State && !lastF10State)
-                        {
-                            var timeSinceLastTrigger = DateTime.Now - lastTriggerTime;
-                            if (timeSinceLastTrigger.TotalMilliseconds > DEBOUNCE_MS)
-                            {
-                                LogManager.Instance.LogInfomation($"📸 ===== F10 PRESSED in {processName} - Snapshot Only =====");
-                                await CaptureSnapshotOnlyAsync(child, mutex, processName);
-                                lastTriggerTime = DateTime.Now;
-                            }
-                        }
+                        //if (currentF10State && !lastF10State)
+                        //{
+                        //    var timeSinceLastTrigger = DateTime.Now - lastTriggerTime;
+                        //    if (timeSinceLastTrigger.TotalMilliseconds > DEBOUNCE_MS)
+                        //    {
+                        //        LogManager.Instance.LogInfomation($"📸 ===== F10 PRESSED in {processName} - Snapshot Only =====");
+                        //        await CaptureSnapshotOnlyAsync(child, mutex, processName);
+                        //        lastTriggerTime = DateTime.Now;
+                        //    }
+                        //}
 
 
                         lastF10State = currentF10State;

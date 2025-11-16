@@ -16,6 +16,7 @@
             public string Body { get; set; }
             public string DataType { get; set; }
             public string ByteSize { get; set; }
+            public bool IsCompleted { get; set; } =false;
         }
 
         public class NetworkResponse
@@ -24,6 +25,8 @@
             public string Body { get; set; }
             public string DataType { get; set; }
             public string ByteSize { get; set; }
+            public bool IsCompleted { get; set; } = false;
+
         }
     }
 }

@@ -162,7 +162,7 @@ namespace Common.Helper
                 string backupPath = $"{_filePath}.backup_{DateTime.Now:yyyyMMdd_HHmmss}";
                 File.Copy(_filePath, backupPath, overwrite: true);
 
-                LogManager.Instance.LogInfomation($"📦 Backup created: {Path.GetFileName(backupPath)}");
+                LogManager.Instance.LogInfomation($" Backup created: {Path.GetFileName(backupPath)}");
                 return backupPath;
             }
             catch (Exception ex)

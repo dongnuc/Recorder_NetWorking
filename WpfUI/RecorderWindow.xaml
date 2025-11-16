@@ -5,7 +5,8 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:WpfUI"
         mc:Ignorable="d"
-        Title="RecorderWindow" Height="700" Width="1200">
+        Title="RecorderWindow" Height="700" Width="1200"
+        Closing="Window_Closing">
     <Grid>
         <DockPanel>
 

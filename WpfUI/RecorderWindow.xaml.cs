@@ -12,6 +12,7 @@ using System.ComponentModel;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Windows;
+using System.Windows.Data;
 using static Common.Models.Entities.MiddlewareModel;
 using File = System.IO.File;
 
@@ -142,6 +143,10 @@ namespace WpfUI
             LogManager.Instance.LogInfomation($"📝 Recorder window opened: {testCaseName}");
         }
 
+        private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
+        {
+            this.DataContext = null;
+        }
         public async Task InitializeAsync()
         {
             var (proxyPort, serverPort) = PortChecker.GetTwoAvailablePorts(8000, 9000);
@@ -156,22 +161,6 @@ namespace WpfUI
             _proxyPort = proxyPort; _serverPort = serverPort;
 
             await Task.Delay(500);
-            try
-            {
-                //await MiddlewareStart.Instance.StartAsync(proxyPort, serverPort, _isHttp);
-                //_isMiddlewareRunning = true;
-            }
-            catch (Exception ex)
-            {
-                LogManager.Instance.LogError($"❌ Failed to start processes: {ex.Message}");
-                MessageBox.Show(
-                    $"Failed to start processes!\n\n{ex.Message}",
-                    "Startup Error",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error
-                );
-                this.Close();
-            }
         }
 
         #endregion
@@ -214,7 +203,7 @@ namespace WpfUI
         }
 
         /// <summary>
-        /// FIXED: Handle user input and create NEW STAGE
+        /// Handle user input and create NEW STAGE
         /// </summary>
         private void OnStageCreated(int stageIndex)
         {
@@ -238,13 +227,13 @@ namespace WpfUI
         }
 
         /// <summary>
-        /// ✅ FIXED: Update single object properties in current stage
+        /// Update single object properties in current stage
         /// </summary>
         private void OnStageUpdated(int stageIndex)
         {
             Dispatcher.Invoke(() =>
             {
-                LogManager.Instance.LogDebug($"🔄 Stage {stageIndex} updated");
+                LogManager.Instance.LogDebug($" Stage {stageIndex} updated");
 
                 // Refresh UI if currently viewing this stage
                 if (SelectedStageKey == stageIndex)
@@ -265,7 +254,7 @@ namespace WpfUI
         {
             Dispatcher.Invoke(() =>
             {
-                LogManager.Instance.LogDebug($"📚 Test stages changed (total: {testStages.Count})");
+                LogManager.Instance.LogDebug($" Test stages changed (total: {testStages.Count})");
 
                 // Refresh current stage data
                 int currentStageIndex = _testkitManagerService.GetCurrentStageIndex();
@@ -312,7 +301,7 @@ namespace WpfUI
 
             if (result == MessageBoxResult.Yes)
             {
-                // ✅ Get test stages from TestkitManagerService
+                // Get test stages from TestkitManagerService
                 var testStages = _testkitManagerService.GetCurrentTestStages();
                 if (testStages.ContainsKey(SelectedStageKey))
                 {
@@ -333,7 +322,7 @@ namespace WpfUI
                         SelectedStageData = new TestStage();
                     }
 
-                    LogManager.Instance.LogInfomation($"🗑️ Stage {SelectedStageKey} deleted");
+                    LogManager.Instance.LogInfomation($" Stage {SelectedStageKey} deleted");
 
                     // Notify UI to refresh
                     OnPropertyChanged(nameof(TestStages));
@@ -341,7 +330,7 @@ namespace WpfUI
                 }
                 else
                 {
-                    LogManager.Instance.LogWarning($"⚠️ Stage {SelectedStageKey} not found in TestkitManagerService");
+                    LogManager.Instance.LogWarning($" Stage {SelectedStageKey} not found in TestkitManagerService");
                     MessageBox.Show(
                         $"Stage {SelectedStageKey} not found.",
                         "Error",
@@ -366,7 +355,7 @@ namespace WpfUI
                 {
                     currentStage.User = null;
                     OnPropertyChanged(nameof(SelectedStageData));
-                    LogManager.Instance.LogDebug($"✅ User input cleared for Stage {SelectedStageKey}");
+                    LogManager.Instance.LogDebug($" User input cleared for Stage {SelectedStageKey}");
                 }
             }
         }
@@ -386,7 +375,7 @@ namespace WpfUI
                 {
                     currentStage.Client = null;
                     OnPropertyChanged(nameof(SelectedStageData));
-                    LogManager.Instance.LogDebug($"✅ Client output cleared for Stage {SelectedStageKey}");
+                    LogManager.Instance.LogDebug($" Client output cleared for Stage {SelectedStageKey}");
                 }
             }
         }
@@ -406,7 +395,7 @@ namespace WpfUI
                 {
                     currentStage.Server = null;
                     OnPropertyChanged(nameof(SelectedStageData));
-                    LogManager.Instance.LogDebug($"✅ Server output cleared for Stage {SelectedStageKey}");
+                    LogManager.Instance.LogDebug($" Server output cleared for Stage {SelectedStageKey}");
                 }
             }
         }
@@ -426,7 +415,7 @@ namespace WpfUI
                 {
                     currentStage.Database = new Database();
                     OnPropertyChanged(nameof(SelectedStageData));
-                    LogManager.Instance.LogDebug($"✅ Database data cleared for Stage {SelectedStageKey}");
+                    LogManager.Instance.LogDebug($" Database data cleared for Stage {SelectedStageKey}");
                 }
             }
         }
@@ -446,7 +435,7 @@ namespace WpfUI
                 {
                     currentStage.Network = new Network();
                     OnPropertyChanged(nameof(SelectedStageData));
-                    LogManager.Instance.LogDebug($"✅ Network data cleared for Stage {SelectedStageKey}");
+                    LogManager.Instance.LogDebug($" Network data cleared for Stage {SelectedStageKey}");
                 }
             }
         }
@@ -470,6 +459,20 @@ namespace WpfUI
         /// </summary>
         protected override async void OnClosing(CancelEventArgs e)
         {
+            if (_isClosing)
+            {
+                try
+                {
+                    StageKeys?.Clear();
+                    SelectedStageData = null;
+                    this.DataContext = null;
+                    BindingOperations.ClearAllBindings(this);
+                }
+                catch { }
+                base.OnClosing(e);
+                return;
+            }
+            e.Cancel = true;
             var result = MessageBox.Show(
                 "Stop recording and close?\n\nAll processes will be terminated.",
                 "Confirm Close",
@@ -485,9 +488,10 @@ namespace WpfUI
             try
             {
                 LogManager.Instance.LogInfomation("Closing RecorderWindow - stopping all processes...");
-
+                this.IsEnabled = false;
+                _isClosing = true;
                 await CleanupAsync();
-
+                this.Close();
                 LogManager.Instance.LogInfomation("Recording stopped - all processes terminated");
             }
             catch (Exception ex)
@@ -500,9 +504,10 @@ namespace WpfUI
                     "Error",
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
+                _isClosing = true;
+                base.OnClosing(e);
             }
 
-            base.OnClosing(e);
         }
 
         private async Task CloseClientAsync()
@@ -566,7 +571,6 @@ namespace WpfUI
                 LogManager.Instance.LogDebug("Middleware already stopped by another thread");
                 return;
             }
-            _isMiddlewareRunning = false;
             try
             {
                 if (MiddlewareStart.Instance.IsRunning)
@@ -579,7 +583,7 @@ namespace WpfUI
             catch (Exception ex)
             {
             }
-            
+
         }
 
         private async Task CloseServerAsync()
@@ -643,7 +647,6 @@ namespace WpfUI
         {
             try
             {
-                // ✅ SỬA: Lấy data từ TestkitManagerService
                 var testStages = _testkitManagerService.GetCurrentTestStages();
 
                 if (testStages == null || !testStages.Any())
@@ -656,7 +659,6 @@ namespace WpfUI
                     return;
                 }
 
-                // Collect all data from all stages
                 var allUsers = testStages
                     .OrderBy(x => x.Key)
                     .Where(stage => stage.Value.User != null && stage.Value.User.Stage > 0)
@@ -692,23 +694,14 @@ namespace WpfUI
                     .Cast<object>()
                     .ToList();
 
-                var sheetsList = new List<(string SheetName, ICollection<object> Data)>();
-
-                if (allUsers.Any())
-                    sheetsList.Add(("User", allUsers));
-
-                if (allClients.Any())
-                    sheetsList.Add(("Client", allClients));
-
-                if (allServers.Any())
-                    sheetsList.Add(("Server", allServers));
-
-                if (allDatabases.Any())
-                    sheetsList.Add(("Database", allDatabases));
-
-                if (allNetworks.Any())
-                    sheetsList.Add(("Network", allNetworks));
-
+                var sheetsList = new List<(string SheetName, ICollection<object> Data)>
+                {
+                    ("User", allUsers),
+                    ("Client", allClients),
+                    ("Server", allServers),
+                    ("Database", allDatabases),
+                    ("Network", allNetworks)
+                };
                 if (!sheetsList.Any())
                 {
                     MessageBox.Show(
@@ -725,12 +718,12 @@ namespace WpfUI
                 ExcelExecution exporter = new ExcelExecution();
                 exporter.ExportToExcelParams(detailsPath, sheetsList.ToArray());
 
-                LogManager.Instance.LogInfomation($"✅ Exported test data to: {detailsPath}");
+                LogManager.Instance.LogInfomation($" Exported test data to: {detailsPath}");
                 MessageBox.Show($"Data exported successfully to:\n{detailsPath}", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
-                LogManager.Instance.LogError($"❌ Error exporting data: {ex.Message}");
+                LogManager.Instance.LogError($" Error exporting data: {ex.Message}");
                 MessageBox.Show($"Lỗi khi xuất dữ liệu:\n\n{ex.Message}", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
@@ -955,13 +948,6 @@ namespace WpfUI
 
         public async Task CleanupAsync()
         {
-            if (_isClosing)
-            {
-                return; // Already cleaning up
-            }
-
-            _isClosing = true;
-
             try
             {
                 LogManager.Instance?.LogInfomation("🛑 Cleaning up RecorderWindow resources...");
@@ -1008,7 +994,7 @@ namespace WpfUI
                     LogManager.Instance?.LogInfomation($"Waiting for {tasks.Count} process(es) to close...");
                     await Task.WhenAll(tasks);
                 }
-                await Task.Delay(500);
+                await Task.Delay(1000);
                 // Stop middleware
                 if (_isMiddlewareRunning)
                 {

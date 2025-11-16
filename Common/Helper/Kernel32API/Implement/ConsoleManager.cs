@@ -34,8 +34,18 @@ namespace Common.Helper.Kernel32API
             mutexManager.Wait(mutex);
             if (AttachConsole(processId))
             {
-                GenerateConsoleCtrlEvent(Constants.CTRL_C_EVENT, 0);
-                FreeConsole();
+                NativeApi.Kernel32.SetConsoleCtrlHandler(null, true);
+                try
+                {
+                    GenerateConsoleCtrlEvent(Constants.CTRL_C_EVENT, 0);
+
+                    System.Threading.Thread.Sleep(500);
+                }
+                finally
+                {
+                    NativeApi.Kernel32.SetConsoleCtrlHandler(null, false);
+                    FreeConsole();
+                }
             }
             mutexManager.Release(mutex);
         }

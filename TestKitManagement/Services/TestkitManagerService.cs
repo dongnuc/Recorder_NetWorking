@@ -143,7 +143,7 @@ namespace TestKitManagement.Services
                 LogManager.Instance.LogWarning("Received null transaction from Middleware");
                 return;
             }
-
+            
             lock (_lock)
             {
                 _pendingTransactions.Enqueue(transaction);
