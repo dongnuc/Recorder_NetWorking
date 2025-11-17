@@ -17,7 +17,6 @@ namespace WpfUI.ViewModels
         private readonly IOFileHandler _fileHandler;
         private readonly string _projectPath;
 
-        // Giữ lại các biến này, nhưng load chúng từ Settings
         private readonly string _clientExePath;
         private readonly string _serverExePath;
 
@@ -123,7 +122,10 @@ namespace WpfUI.ViewModels
 
                 _folderHandler.ReplaceSheetExcel(srcSheetPath, destEnvPath);
 
-                _folderHandler.CreateDirectory(questionPath, "Meta");
+                string metaPath = _folderHandler.CreateDirectory(questionPath, "Meta");
+                string givenPath = _folderHandler.CreateDirectory(metaPath, "Given");
+                _folderHandler.CreateDirectory(givenPath, "Client");
+                _folderHandler.CreateDirectory(givenPath, "Server");
 
                 LoadFileTree();
                 LogManager.Instance.LogInfomation($"Created new question: {questionName}. UseDatabase={useDatabase}");
@@ -188,7 +190,10 @@ namespace WpfUI.ViewModels
                 }
 
                 _folderHandler.ReplaceSheetExcel(srcSheetPath, destEnvPath);
-                _folderHandler.CreateDirectory(testCasePath, "Meta");
+                string metaPath = _folderHandler.CreateDirectory(testCasePath, "Meta");
+                string givenPath = _folderHandler.CreateDirectory(metaPath, "Given");
+                _folderHandler.CreateDirectory(givenPath, "Client");
+                _folderHandler.CreateDirectory(givenPath, "Server");
                 try
                 {
                     string parentHeaderPath = Path.Combine(SelectedItem.FullPath, "Header.xlsx");
@@ -235,8 +240,51 @@ namespace WpfUI.ViewModels
             {
                 try
                 {
+                    string projectRootPath = RootItems.Count > 0 ? RootItems[0].FullPath : string.Empty;
+                    string parentPath = Path.GetDirectoryName(SelectedItem.FullPath);
+                    bool isQuestion = !string.IsNullOrEmpty(parentPath) && parentPath.Equals(projectRootPath, StringComparison.OrdinalIgnoreCase);
+
+                    bool isTestCase = !SelectedItem.FullPath.Equals(projectRootPath, StringComparison.OrdinalIgnoreCase) && !isQuestion;
+
+                    if (isTestCase && SelectedItem.IsFolder)
+                    {
+                        string parentHeaderPath = Path.Combine(parentPath, "Header.xlsx");
+                        string testCaseName = SelectedItem.Name;
+
+                        LogManager.Instance.LogInfomation($"Deleting TestCase. Removing '{testCaseName}' from {parentHeaderPath}...");
+
+                        try
+                        {
+                            (int row, int col) = _fileHandler.FindStringInExcel(parentHeaderPath, "TestSuite", testCaseName);
+                            if (row > 0)
+                            {
+                                _fileHandler.DeleteRow(parentHeaderPath, "TestSuite", row);
+                                LogManager.Instance.LogInfomation($"Removed from 'TestSuite' at row {row}");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            LogManager.Instance.LogWarning($"Could not remove row from 'TestSuite'. Error: {ex.Message}");
+                        }
+
+                        try
+                        {
+                            (int row, int col) = _fileHandler.FindStringInExcel(parentHeaderPath, "QuestionMark", testCaseName);
+                            if (row > 0)
+                            {
+                                _fileHandler.DeleteRow(parentHeaderPath, "QuestionMark", row);
+                                LogManager.Instance.LogInfomation($"Removed from 'QuestionMark' at row {row}");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            LogManager.Instance.LogWarning($"Could not remove row from 'QuestionMark'. Error: {ex.Message}");
+                        }
+                    }
+
                     _folderHandler.DeleteFileOrFolder(SelectedItem.FullPath);
-                    LogManager.Instance.LogInfomation($"Deleted: {SelectedItem.Name}");
+                    LogManager.Instance.LogInfomation($"🗑️ Deleted: {SelectedItem.Name}");
+
                     LoadFileTree();
                 }
                 catch (Exception ex)
@@ -245,6 +293,43 @@ namespace WpfUI.ViewModels
                     MessageBox.Show($"Failed to delete: {ex.Message}", "Error");
                 }
             }
+        }
+
+        public async void UpdateAllQuestionConfigs()
+        {
+            string newProtocol = Settings.Default.Protocol;
+            LogManager.Instance.LogInfomation($"Starting to update all Question configs to '{newProtocol}'...");
+
+            try
+            {
+                await Task.Run(() =>
+                {
+                    var questionFolders = Directory.GetDirectories(_projectPath);
+
+                    foreach (var folderPath in questionFolders)
+                    {
+                        string headerPath = Path.Combine(folderPath, "Header.xlsx");
+                        if (File.Exists(headerPath))
+                        {
+                            try
+                            {
+                                _fileHandler.ModifyExcelCellContent(headerPath, "Config", 3, 2, newProtocol);
+                                LogManager.Instance.LogInfomation($"Updated config for: {Path.GetFileName(folderPath)}");
+                            }
+                            catch (Exception ex)
+                            {
+                                LogManager.Instance.LogWarning($"Failed to update {headerPath}. Error: {ex.Message}");
+                            }
+                        }
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                LogManager.Instance.LogError($"General error in UpdateAllQuestionConfigs: {ex.Message}");
+            }
+
+            LogManager.Instance.LogInfomation("Finished updating all Question configs.");
         }
 
         #endregion

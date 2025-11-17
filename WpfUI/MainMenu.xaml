@@ -72,17 +72,7 @@
     </Window.Resources>
 
     <DockPanel>
-        <!-- Menu Bar -->
-        <Menu DockPanel.Dock="Top" Background="WhiteSmoke" BorderBrush="#DDD" BorderThickness="0,0,0,1">
-            <MenuItem Header="_File" Padding="10,5">
-                <MenuItem Header="_New Test Case..." Click="BtnCreateTestCase_Click"/>
-                <Separator/>
-                <MenuItem Header="_Exit" Click="BtnExit_Click"/>
-            </MenuItem>
-            <MenuItem Header="_Tools" Padding="10,5">
-                <MenuItem Header="Reset DB" Click="BtnResetDb_Click"/>
-            </MenuItem>
-        </Menu>
+        
 
         <!-- Toolbar -->
         <Border DockPanel.Dock="Top" Background="#2C3E50" Padding="10">
@@ -108,6 +98,16 @@
                         Cursor="Hand"
                         FontWeight="SemiBold"
                         Click="BtnResetDb_Click"/>
+                <TextBlock Text="|" Foreground="#526D8B" VerticalAlignment="Center" Margin="5,0"/>
+                <Button Content="Exit" 
+                        ToolTip="Exit" 
+                        Padding="8,4" Margin="0,0,5,0"
+                        Background="#E74C3C" 
+                        Foreground="White" 
+                        BorderThickness="0" 
+                        Cursor="Hand"
+                        FontWeight="SemiBold"
+                        Click="BtnExit_Click"/>
                 <TextBlock Text="|" Foreground="#526D8B" VerticalAlignment="Center" Margin="5,0"/>
 
             </WrapPanel>

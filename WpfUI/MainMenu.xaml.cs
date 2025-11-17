@@ -57,7 +57,7 @@ namespace WpfUI
                     }
                     catch (System.ComponentModel.Win32Exception ex)
                     {
-                        MessageBox.Show($"Không thể mở file. Máy của bạn không có chương trình nào được liên kết với file '.xlsx'.\n\nLỗi: {ex.Message}",
+                        MessageBox.Show($"Không thể mở file.\n\nLỗi: {ex.Message}",
                             "Lỗi Mở File", MessageBoxButton.OK, MessageBoxImage.Error);
                     }
                     catch (Exception ex)
@@ -73,7 +73,10 @@ namespace WpfUI
         {
             var dialog = new ConfigWindow();
             dialog.Owner = this;
-            dialog.ShowDialog();
+            if (dialog.ShowDialog() == true)
+            {
+                _viewModel.UpdateAllQuestionConfigs();
+            }
 
         }
         private void TreeViewItem_ContextMenuOpening(object sender, ContextMenuEventArgs e)
@@ -140,7 +143,7 @@ namespace WpfUI
             if (_viewModel.SelectedItem == null || !_viewModel.SelectedItem.IsFolder ||
                 (_viewModel.RootItems.Count > 0 && _viewModel.SelectedItem.FullPath.Equals(_viewModel.RootItems[0].FullPath, StringComparison.OrdinalIgnoreCase)))
             {
-                MessageBox.Show("Bạn phải chọn một thư mục Question (không phải thư mục gốc) để tạo TestCase.", "Warning");
+                MessageBox.Show("Bạn phải chọn một thư mục Question để tạo TestCase.", "Warning");
                 return;
             }
 
@@ -168,7 +171,7 @@ namespace WpfUI
 
         private void BtnExit_Click(object sender, RoutedEventArgs e)
         {
-            Application.Current.Shutdown();
+            this.Close();
         }
 
         private void BtnResetDb_Click(object sender, RoutedEventArgs e)
