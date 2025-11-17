@@ -306,28 +306,59 @@ namespace Middleware.Services
                 Response = new NetworkResponse { StatusCode = "OK" }
             };
 
-            //  Lock để đảm bảo chỉ raise event 1 lần
             var transactionLock = new object();
             bool transactionCompleted = false;
+            TcpClient server = null;
 
             try
             {
-                using (client)
-                using (var server = new TcpClient())
+                server = new TcpClient();
+
+                LogManager.Instance.LogDebug($"🔌 Middleware: Client connected, attempting to connect to server at localhost:{_serverPort}");
+
+                try
                 {
+                    //  Connect to actual server
                     await server.ConnectAsync(IPAddress.Loopback, _serverPort, token);
+                    LogManager.Instance.LogInfomation($"✅ Middleware: Successfully connected to server at localhost:{_serverPort}");
+                }
+                catch (SocketException ex)
+                {
+                    LogManager.Instance.LogError($"❌ Middleware: Failed to connect to server at localhost:{_serverPort}");
+                    LogManager.Instance.LogError($"   Error: {ex.Message} (SocketErrorCode: {ex.SocketErrorCode})");
+
+                    // Send error back to client
+                    try
+                    {
+                        using var errorStream = client.GetStream();
+                        var errorMsg = Encoding.UTF8.GetBytes($"ERROR: Cannot connect to server on port {_serverPort}\r\n");
+                        await errorStream.WriteAsync(errorMsg, 0, errorMsg.Length, token);
+                        await errorStream.FlushAsync(token);
+                    }
+                    catch { }
+
+                    return; // Exit if cannot connect to server
+                }
+
+                //  Both client and server connected - start relay
+                using (client)
+                using (server)
+                {
+                    LogManager.Instance.LogDebug($"🔄 Middleware: Starting bidirectional relay");
 
                     using var clientStream = client.GetStream();
                     using var serverStream = server.GetStream();
 
+                    //  Start Client → Server relay task
                     var c2s = RelayTcpDataAsync(
                         clientStream,
                         serverStream,
                         transaction.Request,
                         token,
-                        onComplete: null 
+                        onComplete: null
                     );
 
+                    // Start Server → Client relay task
                     var s2c = RelayTcpDataAsync(
                         serverStream,
                         clientStream,
@@ -335,14 +366,12 @@ namespace Middleware.Services
                         token,
                         onComplete: () =>
                         {
-                            //  Callback khi RESPONSE hoàn thành
                             lock (transactionLock)
                             {
                                 if (!transactionCompleted)
                                 {
                                     transactionCompleted = true;
 
-                                    // Kiểm tra có data không
                                     bool hasRequestData = !string.IsNullOrWhiteSpace(transaction.Request?.Body);
                                     bool hasResponseData = !string.IsNullOrWhiteSpace(transaction.Response?.Body);
 
@@ -359,11 +388,19 @@ namespace Middleware.Services
                             }
                         }
                     );
+                    await Task.WhenAll(c2s, s2c);
+
+                    LogManager.Instance.LogDebug($"✅ Middleware: Both relay tasks completed");
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                LogManager.Instance.LogDebug($"🛑 Middleware: TCP connection cancelled");
             }
             catch (Exception ex)
             {
-                LogManager.Instance.LogError($"TCP connection error: {ex.Message}");
+                LogManager.Instance.LogError($"❌ Middleware: TCP connection error: {ex.Message}");
+                LogManager.Instance.LogError($"   Stack trace: {ex.StackTrace}");
 
                 lock (transactionLock)
                 {
@@ -374,8 +411,16 @@ namespace Middleware.Services
                     }
                 }
             }
+            finally
+            {
+                try
+                {
+                    server?.Dispose();
+                    client?.Dispose();
+                }
+                catch { }
+            }
         }
-
         private async Task RelayTcpDataAsync(
             NetworkStream from,
             NetworkStream to,
