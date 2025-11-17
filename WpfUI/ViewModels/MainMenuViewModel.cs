@@ -1,12 +1,15 @@
 ﻿using Common.Interfaces.IOFile;
 using Common.Logging;
-using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Windows;
-using WpfUI.Properties; // Cần thiết để đọc Settings.Default
+using System;
+using WpfUI.Properties;
+using System.Collections.Generic;
+using OfficeOpenXml; // (Dùng để sửa lỗi File Locking)
+using System.Threading.Tasks;
 
 namespace WpfUI.ViewModels
 {
@@ -16,7 +19,6 @@ namespace WpfUI.ViewModels
         private readonly IOFolderHandler _folderHandler;
         private readonly IOFileHandler _fileHandler;
         private readonly string _projectPath;
-
         private readonly string _clientExePath;
         private readonly string _serverExePath;
 
@@ -45,12 +47,15 @@ namespace WpfUI.ViewModels
             _folderHandler = folderHandler;
             _fileHandler = fileHandler;
             _projectPath = projectPath;
+
+            _clientExePath = Settings.Default.ClientExePath;
+            _serverExePath = Settings.Default.ServerExePath;
+
             RootItems = new ObservableCollection<FileSystemItemViewModel>();
             LoadFileTree();
         }
 
         #region File/Folder Tree Logic
-
 
         public void LoadFileTree()
         {
@@ -128,7 +133,7 @@ namespace WpfUI.ViewModels
                 _folderHandler.CreateDirectory(givenPath, "Server");
 
                 LoadFileTree();
-                LogManager.Instance.LogInfomation($"Created new question: {questionName}. UseDatabase={useDatabase}");
+                LogManager.Instance.LogInfomation($"✅ Created new question: {questionName}. UseDatabase={useDatabase}");
             }
             catch (Exception ex)
             {
@@ -136,6 +141,7 @@ namespace WpfUI.ViewModels
                 MessageBox.Show($"Failed to create question: {ex.Message}", "Error");
             }
         }
+
 
         public async Task<string> CreateNewTestCase(string testCaseName)
         {
@@ -190,7 +196,7 @@ namespace WpfUI.ViewModels
                 }
 
                 _folderHandler.ReplaceSheetExcel(srcSheetPath, destEnvPath);
-                string metaPath = _folderHandler.CreateDirectory(testCasePath, "Meta");
+                String metaPath =_folderHandler.CreateDirectory(testCasePath, "Meta");
                 string givenPath = _folderHandler.CreateDirectory(metaPath, "Given");
                 _folderHandler.CreateDirectory(givenPath, "Client");
                 _folderHandler.CreateDirectory(givenPath, "Server");
@@ -199,7 +205,7 @@ namespace WpfUI.ViewModels
                     string parentHeaderPath = Path.Combine(SelectedItem.FullPath, "Header.xlsx");
 
                     LogManager.Instance.LogInfomation($"Appending '{testCaseName}' to Header file: {parentHeaderPath}...");
-                    
+
                     await _fileHandler.AppendNewRow(parentHeaderPath, "TestSuite", testCaseName, string.Empty);
 
                     await _fileHandler.AppendNewRow(parentHeaderPath, "QuestionMark", testCaseName, string.Empty);
@@ -210,7 +216,6 @@ namespace WpfUI.ViewModels
                 }
                 LoadFileTree();
                 return testCasePath;
-                LogManager.Instance.LogInfomation($"Created new test case: {testCaseName}. UseDatabase={useDatabase}");
             }
             catch (Exception ex)
             {
@@ -243,7 +248,6 @@ namespace WpfUI.ViewModels
                     string projectRootPath = RootItems.Count > 0 ? RootItems[0].FullPath : string.Empty;
                     string parentPath = Path.GetDirectoryName(SelectedItem.FullPath);
                     bool isQuestion = !string.IsNullOrEmpty(parentPath) && parentPath.Equals(projectRootPath, StringComparison.OrdinalIgnoreCase);
-
                     bool isTestCase = !SelectedItem.FullPath.Equals(projectRootPath, StringComparison.OrdinalIgnoreCase) && !isQuestion;
 
                     if (isTestCase && SelectedItem.IsFolder)
@@ -283,7 +287,7 @@ namespace WpfUI.ViewModels
                     }
 
                     _folderHandler.DeleteFileOrFolder(SelectedItem.FullPath);
-                    LogManager.Instance.LogInfomation($"🗑️ Deleted: {SelectedItem.Name}");
+                    LogManager.Instance.LogInfomation($"Deleted: {SelectedItem.Name}");
 
                     LoadFileTree();
                 }

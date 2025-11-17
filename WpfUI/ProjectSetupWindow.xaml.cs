@@ -1,5 +1,4 @@
 ﻿using Common.Interfaces.IOFile;
-using Common.Interfaces.Services;
 using Common.Logging;
 using FileManagement.FileHelper.FileHandler;
 using FileManagement.FolderHelper;
@@ -21,14 +20,15 @@ namespace WpfUI
         public bool ProjectCreatedSuccessfully { get; private set; } = false;
         public MainMenuViewModel ViewModel { get; private set; }
 
-        public ProjectSetupWindow()
+        public ProjectSetupWindow(IOFolderHandler folderHandler, IOFileHandler fileHandler)
         {
             InitializeComponent();
             ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
-            _folderHandler = new FolderHandler();
-            _fileHandler = new ExcelExecution();
-            LogManager.Instance.LogInfomation("ProjectSetupWindow opened");
 
+            _folderHandler = folderHandler;
+            _fileHandler = fileHandler;
+
+            LogManager.Instance.LogInfomation("ProjectSetupWindow opened");
             LoadSettings();
         }
 
@@ -39,45 +39,43 @@ namespace WpfUI
                 string parentDir = Path.GetDirectoryName(Settings.Default.ProjectPath);
                 if (!string.IsNullOrEmpty(parentDir))
                 {
-                    TxtTestKitLocation.Text = parentDir;
+                    TxtProjectLocation.Text = parentDir;
                 }
                 else
                 {
-                    TxtTestKitLocation.Text = Settings.Default.ProjectPath;
+                    TxtProjectLocation.Text = Settings.Default.ProjectPath;
                 }
             }
         }
 
-        #region Browse Buttons
         private void BtnBrowseFolder_Click(object sender, RoutedEventArgs e)
         {
             var dialog = new OpenFileDialog { ValidateNames = false, CheckFileExists = false, CheckPathExists = true, FileName = "Select Folder", Title = "Select the base folder to create your project in" };
-            if (dialog.ShowDialog() == true) { TxtTestKitLocation.Text = Path.GetDirectoryName(dialog.FileName); }
+            if (dialog.ShowDialog() == true) { TxtProjectLocation.Text = Path.GetDirectoryName(dialog.FileName); }
         }
-        #endregion
 
         private void BtnCreateProject_Click(object sender, RoutedEventArgs e)
         {
-            if (string.IsNullOrWhiteSpace(TxtTestKitName.Text) ||
-                string.IsNullOrWhiteSpace(TxtTestKitLocation.Text))
+            if (string.IsNullOrWhiteSpace(TxtProjectName.Text) ||
+                string.IsNullOrWhiteSpace(TxtProjectLocation.Text))
             {
                 MessageBox.Show("Project Name and Location are required.", "Error");
                 return;
             }
 
             TxtStatus.Text = "Checking project...";
-            BtnCreateTestKit.IsEnabled = false;
+            BtnCreateProject.IsEnabled = false;
 
             try
             {
-                string basePath = TxtTestKitLocation.Text;
-                string projectName = TxtTestKitName.Text;
+                string basePath = TxtProjectLocation.Text;
+                string projectName = TxtProjectName.Text;
                 string projectRoot = Path.Combine(basePath, projectName);
 
                 if (Directory.Exists(projectRoot))
                 {
                     var result = MessageBox.Show(
-                        "Testkit này đã tồn tại.\nBạn có muốn edit (chỉnh sửa) testkit này không?",
+                        "Testkit này đã tồn tại.\nBạn có muốn edit testkit này không?",
                         "Cảnh báo: Project đã tồn tại",
                         MessageBoxButton.YesNo,
                         MessageBoxImage.Warning);
@@ -85,7 +83,7 @@ namespace WpfUI
                     if (result == MessageBoxResult.No)
                     {
                         TxtStatus.Text = "Đã hủy. Vui lòng chọn tên hoặc vị trí khác.";
-                        BtnCreateTestKit.IsEnabled = true;
+                        BtnCreateProject.IsEnabled = true;
                         return;
                     }
                     LogManager.Instance.LogInfomation($"Opening existing project at: {projectRoot}");
@@ -99,12 +97,15 @@ namespace WpfUI
                 Settings.Default.ProjectPath = projectRoot;
                 Settings.Default.Save();
                 LogManager.Instance.LogInfomation($"Settings saved (ProjectPath).");
+
                 this.ViewModel = new MainMenuViewModel(
                     _folderHandler,
                     _fileHandler,
                     projectRoot
                 );
+
                 this.ProjectCreatedSuccessfully = true;
+
                 this.Close();
             }
             catch (Exception ex)
@@ -112,7 +113,7 @@ namespace WpfUI
                 TxtStatus.Text = "Failed to create/open project.";
                 LogManager.Instance.LogError($"Failed to create/open project: {ex.Message}");
                 MessageBox.Show($"Failed to create/open project: {ex.Message}", "Error");
-                BtnCreateTestKit.IsEnabled = true;
+                BtnCreateProject.IsEnabled = true;
             }
         }
     }

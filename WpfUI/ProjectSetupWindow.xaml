@@ -1,7 +1,7 @@
 ﻿<Window x:Class="WpfUI.ProjectSetupWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="UITestKit - TestKit Setup" 
+        Title="UITestKit - Project Setup" 
         Height="450" Width="800"
         WindowStartupLocation="CenterScreen"
         Background="#ECF0F1">
@@ -15,30 +15,30 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <TextBlock Grid.Row="0" Text="TestKit Project Setup" FontSize="24" FontWeight="Bold" Foreground="#2C3E50" Margin="0,0,0,20"/>
+        <TextBlock Grid.Row="0" Text="🎙️ Test Case Project Setup" FontSize="24" FontWeight="Bold" Foreground="#2C3E50" Margin="0,0,0,20"/>
 
-        <GroupBox Grid.Row="1" Header="TestKit Name" Margin="0,0,0,10">
-            <TextBox x:Name="TxtTestKitName" Height="30" VerticalContentAlignment="Center" Text="MyNewTestKit"/>
+        <GroupBox Grid.Row="1" Header="Project Name" Margin="0,0,0,10">
+            <TextBox x:Name="TxtProjectName" Height="30" VerticalContentAlignment="Center" Text="MyNewTestKit"/>
         </GroupBox>
 
-        <GroupBox Grid.Row="2" Header="TestKit Location" Margin="0,0,0,10">
+        <GroupBox Grid.Row="2" Header="Project Location" Margin="0,0,0,10">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <TextBox x:Name="TxtTestKitLocation" Grid.Column="0" Height="30" VerticalContentAlignment="Center" Margin="0,0,10,0" Text="D:\MyTestCases"/>
+                <TextBox x:Name="TxtProjectLocation" Grid.Column="0" Height="30" VerticalContentAlignment="Center" Margin="0,0,10,0" Text="D:\MyTestCases"/>
                 <Button Grid.Column="1" Content="📁 Browse Folder" Width="120" Height="30" Click="BtnBrowseFolder_Click"/>
             </Grid>
         </GroupBox>
 
         <Border Grid.Row="3" Background="#34495E" Padding="10" CornerRadius="5" Margin="0,10,0,10">
-            <TextBlock x:Name="TxtStatus" Text="Ready to setup TestKit" Foreground="White" FontWeight="Bold"/>
+            <TextBlock x:Name="TxtStatus" Text="Ready to setup project" Foreground="White" FontWeight="Bold"/>
         </Border>
 
         <Button Grid.Row="4"
-                x:Name="BtnCreateTestKit"
-                Content="Create TestKit"
+                x:Name="BtnCreateProject"
+                Content="Create Project"
                 Height="50" FontSize="16" FontWeight="Bold"
                 Background="#27AE60" Foreground="White"
                 Click="BtnCreateProject_Click" 

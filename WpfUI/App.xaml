@@ -3,15 +3,12 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="clr-namespace:WpfUI"
              xmlns:converters="clr-namespace:WpfUI.Converters"
+             
              StartupUri="ProjectExplorerWindow.xaml"
              >
 
     <Application.Resources>
         <ResourceDictionary>
-            <ResourceDictionary.MergedDictionaries>
-                <!-- Add other resource dictionaries here if needed -->
-            </ResourceDictionary.MergedDictionaries>
-
             <converters:FolderToIconConverter x:Key="FolderToIconConverter" />
         </ResourceDictionary>
     </Application.Resources>

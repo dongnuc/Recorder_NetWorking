@@ -1,46 +1,35 @@
 ﻿using Common.Interfaces.IOFile;
-using Common.Interfaces.Services;
+// (Xóa các Using không cần thiết: IServiceProvider, IProcessManager, v.v...)
 using Common.Logging;
-using Microsoft.Extensions.DependencyInjection;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using WpfUI.Dialogs;
 using WpfUI.Properties;
-using WpfUI.Services;
 using WpfUI.ViewModels;
+using System;
+using System.Linq;
+using Microsoft.Win32;
+using FileManagement.FileHelper;
+using FileManagement.FileHelper.FileHandler;
 
 namespace WpfUI
 {
-    public class TabItemData
-    {
-        public Guid Id { get; set; } = Guid.NewGuid();
-        public string TestCaseName { get; set; } = string.Empty;
-        public TabItem TabItem { get; set; }
-        public RecorderWindow RecorderWindow { get; set; }
-    }
-
-
     public partial class MainMenu : Window
     {
         private MainMenuViewModel _viewModel;
         private readonly IOFileManagement _fileManager;
-
-        private Dictionary<Guid, TabItemData> _activeTabs = new Dictionary<Guid, TabItemData>();
         private IOFileHandler _fileHandler;
-        private readonly IServiceProvider _serviceProvider;
-        public MainMenu(MainMenuViewModel viewModel,
-            IOFileHandler fileHandler,
-            IServiceProvider serviceProvider,
-            IOFileManagement fileManager)
+        
+        public MainMenu(MainMenuViewModel viewModel)
         {
             InitializeComponent();
             _viewModel = viewModel;
             this.DataContext = _viewModel;
-            _fileHandler = fileHandler;
-            _serviceProvider = serviceProvider;
-            _fileManager = fileManager;
+
+            _fileHandler = new ExcelExecution();
+            _fileManager = new FileManage(_fileHandler);
         }
 
         private void FileTree_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
@@ -73,20 +62,20 @@ namespace WpfUI
         {
             var dialog = new ConfigWindow();
             dialog.Owner = this;
+
             if (dialog.ShowDialog() == true)
             {
                 _viewModel.UpdateAllQuestionConfigs();
             }
-
         }
+
         private void TreeViewItem_ContextMenuOpening(object sender, ContextMenuEventArgs e)
         {
             var treeViewItem = sender as TreeViewItem;
             if (treeViewItem == null) return;
 
+
             var selectedItem = _viewModel.SelectedItem;
-
-
             if (selectedItem == null) return;
 
             var contextMenu = treeViewItem.ContextMenu;
@@ -134,7 +123,6 @@ namespace WpfUI
             else
             {
                 cmDeleteTestCase.Visibility = Visibility.Visible;
-                //Win.Content = fileDetailTextBlock;
             }
         }
 
@@ -154,18 +142,20 @@ namespace WpfUI
             string serverPath = Settings.Default.ServerExePath;
             if (string.IsNullOrEmpty(clientPath) || string.IsNullOrEmpty(serverPath))
             {
-                MessageBox.Show("Hãy cấu hình trước khi tạo testcase", "Warning");
+                MessageBox.Show("Hãy cấu hình (Config) đường dẫn Client/Server trước khi tạo testcase.", "Warning");
                 return;
             }
 
             if (dialog.ShowDialog() == true)
             {
                 string testcaseName = dialog.InputText.Trim();
-                var pathTestCase = await _viewModel?.CreateNewTestCase(dialog.InputText);
+                string testcasePath = await _viewModel?.CreateNewTestCase(dialog.InputText);
+
+                if (string.IsNullOrEmpty(testcasePath)) return;
+
                 LogManager.Instance.LogInfomation(dialog.InputText.ToString());
-                string testcasePath = pathTestCase;
                 bool isHttp = Settings.Default.Protocol == "HTTP";
-               await CreateRecorderTab(testcasePath,testcaseName, clientPath, serverPath,isHttp);
+
             }
         }
 
@@ -210,158 +200,8 @@ namespace WpfUI
             {
                 item.Focus();
                 item.IsSelected = true;
-                e.Handled = false; 
+                e.Handled = false;
             }
         }
-        #region recorder tab
-        private async Task CreateRecorderTab(string testcasePath, string testcaseName,string clientPath,string serverPath,bool isHttp)
-        {
-            RecorderWindowScope scope = null;
-            try
-            {
-                Guid tabId = Guid.NewGuid();
-
-                scope = new RecorderWindowScope(_serviceProvider);
-                var processManager = scope.ServiceProvider.GetRequiredService<IProcessManager>();
-                var testkitManagerSerive = scope.ServiceProvider.GetRequiredService<ITestkitManagerService>();
-                var recorderWindow = new RecorderWindow(testcasePath,testcaseName, clientPath,
-                    serverPath,isHttp,
-                    processManager, _fileHandler, testkitManagerSerive);
-
-                var windowContent = recorderWindow.Content as FrameworkElement;
-                recorderWindow.Content = null;
-
-                var tabItem = new TabItem
-                {
-                    Header = testcaseName,
-                    Tag = tabId,
-                    Content = windowContent
-                };
-
-                if (windowContent != null)
-                {
-                    windowContent.DataContext = recorderWindow;
-                }
-
-                var tabData = new TabItemData
-                {
-                    Id = tabId,
-                    TestCaseName = testcaseName,
-                    TabItem = tabItem,
-                    RecorderWindow = recorderWindow,
-                };
-
-                _activeTabs[tabId] = tabData;
-
-                if (_activeTabs.Count == 1)
-                {
-                    WelcomeTab.Visibility = Visibility.Collapsed;
-                }
-
-                TestCaseTabControl.Items.Add(tabItem);
-                TestCaseTabControl.SelectedItem = tabItem;
-                await recorderWindow.InitializeAsync();
-            }
-            catch (Exception ex)
-            {
-            }
-        }
-
-        private void CloseTab_Click(object sender, RoutedEventArgs e)
-        {
-            var button = sender as Button;
-            if(button?.Tag is TabItem tabItem && tabItem.Tag is Guid tabId)
-            {
-                if (_activeTabs.TryGetValue(tabId, out var tabData))
-                {
-                    var result = MessageBox.Show(
-                            $"Bạn có chắc muốn đóng test case '{tabData.TestCaseName}'?\n\nDữ liệu chưa lưu sẽ bị mất.",
-                            "Xác nhận đóng",
-                            MessageBoxButton.YesNo,
-                            MessageBoxImage.Question);
-
-                    if (result == MessageBoxResult.Yes)
-                    {
-                        CloseTabById(tabId);
-                    }
-                }
-            }
-        }
-
-        private async void CloseTabById(Guid id)
-        {
-            try
-            {
-                if (_activeTabs.TryGetValue(id, out var tabData))
-                {
-                    LogManager.Instance?.LogInfomation($" Closing tab: {tabData.TestCaseName} (ID: {id})");
-                    await tabData.RecorderWindow.CleanupAsync();
-                    if (tabData.RecorderWindow != null)
-                    {
-                        try
-                        {
-                            LogManager.Instance?.LogDebug("Calling RecorderWindow.CleanupAsync()");
-                            await tabData.RecorderWindow.CleanupAsync();
-                            LogManager.Instance?.LogDebug("RecorderWindow cleanup completed");
-                        }
-                        catch (Exception ex)
-                        {
-                            LogManager.Instance?.LogWarning($"Error cleaning up RecorderWindow: {ex.Message}");
-                        }
-                    }
-
-
-                    // Remove from UI
-                    TestCaseTabControl.Items.Remove(tabData.TabItem);
-
-                    // Remove from dictionary
-                    _activeTabs.Remove(id);
-
-                    if (_activeTabs.Count == 0)
-                    {
-                        WelcomeTab.Visibility = Visibility.Visible;
-                        TestCaseTabControl.SelectedItem = WelcomeTab;
-                    }
-
-                    LogManager.Instance?.LogInfomation($" Tab closed successfully: {tabData.TestCaseName}");
-                }
-                else
-                {
-                    LogManager.Instance?.LogWarning($"Attempted to close non-existent tab with ID: {id}");
-                }
-            }
-            catch (Exception ex)
-            {
-                LogManager.Instance?.LogError($" Error closing tab (ID: {id}): {ex.Message}");
-                MessageBox.Show($"Error closing tab:\n{ex.Message}", "Error",
-                    MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
-
-        private RecorderWindow GetCurrentRecorderWindowns()
-        {
-            var selectedTab = TestCaseTabControl.SelectedItem as TabItem;
-            if(selectedTab?.Tag is Guid tabId)
-            {
-                if(_activeTabs.TryGetValue(tabId, out var tabData))
-                {
-                    return tabData.RecorderWindow;
-                }
-            }
-            return null;
-        }
-
-        private void TestCaseTabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            var selectedTab = TestCaseTabControl.SelectedItem as TabItem;
-            if (selectedTab?.Tag is Guid tabId)
-            {
-                if (_activeTabs.TryGetValue(tabId, out var tabData))
-                {
-                }
-            }
-        }
-
-        #endregion
     }
 }

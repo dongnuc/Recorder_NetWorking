@@ -6,16 +6,12 @@
         xmlns:local="clr-namespace:WpfUI"
         xmlns:vm="clr-namespace:WpfUI.ViewModels"
         xmlns:controls="clr-namespace:WpfUI.Controls"
-        xmlns:converters="clr-namespace:WpfUI.Converters"
         mc:Ignorable="d"
         Title="UITestKit Main Menu" Height="700" Width="1200"
         WindowStartupLocation="CenterScreen"
         Background="#F0F0F0">
 
     <Window.Resources>
-        <!-- ✅ Thêm Converter -->
-        <converters:FolderToIconConverter x:Key="FolderToIconConverter"/>
-
         <ContextMenu x:Key="TreeViewItemContextMenu">
             <MenuItem Tag="CreateQuestion"
                       Header="Create Question..."
@@ -74,21 +70,20 @@
     <DockPanel>
         
 
-        <!-- Toolbar -->
         <Border DockPanel.Dock="Top" Background="#2C3E50" Padding="10">
             <WrapPanel Orientation="Horizontal">
-                <Separator Width="1" Background="#526D8B" Margin="5,0"/>
                 <Button Content="⚙️ Config" 
-                    ToolTip="Cấu hình Executables và Protocol" 
-                    Padding="8,4" Margin="0,0,5,0"
-                    Background="#3498DB" 
-                    Foreground="White" 
-                    BorderThickness="0" 
-                    Cursor="Hand"
-                    FontWeight="SemiBold"
-                    Click="BtnConfig_Click"/>
+                        ToolTip="Cấu hình Executables và Protocol" 
+                        Padding="8,4" Margin="0,0,5,0"
+                        Background="#3498DB" 
+                        Foreground="White" 
+                        BorderThickness="0" 
+                        Cursor="Hand"
+                        FontWeight="SemiBold"
+                        Click="BtnConfig_Click"/>
 
                 <TextBlock Text="|" Foreground="#526D8B" VerticalAlignment="Center" Margin="5,0"/>
+
                 <Button Content="🔄 Reset DB" 
                         ToolTip="Reset DB" 
                         Padding="8,4" Margin="0,0,5,0"
@@ -109,191 +104,128 @@
                         FontWeight="SemiBold"
                         Click="BtnExit_Click"/>
                 <TextBlock Text="|" Foreground="#526D8B" VerticalAlignment="Center" Margin="5,0"/>
-
             </WrapPanel>
         </Border>
 
-        <!-- ✅ Main Content Grid with Log Panel -->
         <Grid>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="*"/>
-                <RowDefinition Height="5"/>
-                <RowDefinition Height="200" x:Name="LogPanelRow"/>
-            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="300" MinWidth="250"/>
+                <ColumnDefinition Width="5"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
 
-            <!-- Main Content Area (TreeView + TabControl) -->
-            <Grid Grid.Row="0">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="300" MinWidth="250"/>
-                    <ColumnDefinition Width="5"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
+            <Grid Grid.Column="0">
+                <GroupBox Header="📁 Test Case Explorer" Margin="5,0,5,5" FontWeight="Bold" Background="White" BorderBrush="#CCC">
+                    <TreeView x:Name="FileTree" 
+                              ItemsSource="{Binding RootItems}"
+                              SelectedItemChanged="FileTree_SelectedItemChanged"
+                              Margin="5" Background="Transparent" BorderThickness="0"
+                              ScrollViewer.HorizontalScrollBarVisibility="Disabled">
 
-                <!-- TreeView (Left Panel) -->
-                <Grid Grid.Column="0">
-                    <GroupBox Header="📁 Test Case Explorer" Margin="5,0,5,5" FontWeight="Bold" Background="White" BorderBrush="#CCC">
-                        <TreeView x:Name="FileTree" 
-                                  ItemsSource="{Binding RootItems}"
-                                  SelectedItemChanged="FileTree_SelectedItemChanged"
-                                  Margin="5" Background="Transparent" BorderThickness="0"
-                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                        <TreeView.Resources>
 
-                            <TreeView.Resources>
-                                <HierarchicalDataTemplate DataType="{x:Type vm:FileSystemItemViewModel}" ItemsSource="{Binding Children}">
-                                    <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="{Binding IsFolder, Converter={StaticResource FolderToIconConverter}}" 
-                                                   FontFamily="Segoe MDL2 Assets" 
-                                                   VerticalAlignment="Center" Margin="0,0,5,0" FontSize="14"
-                                                   Foreground="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=TreeViewItem}}"/>
-                                        <TextBlock Text="{Binding Name}" 
-                                                   VerticalAlignment="Center"
-                                                   Foreground="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=TreeViewItem}}"/>
-                                    </StackPanel>
-                                </HierarchicalDataTemplate>
+                            <HierarchicalDataTemplate DataType="{x:Type vm:FileSystemItemViewModel}" ItemsSource="{Binding Children}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="{Binding IsFolder, Converter={StaticResource FolderToIconConverter}}" 
+                                               FontFamily="Segoe MDL2 Assets" 
+                                               VerticalAlignment="Center" Margin="0,0,5,0" FontSize="14"
+                                               Foreground="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=TreeViewItem}}"/>
+                                    <TextBlock Text="{Binding Name}" 
+                                               VerticalAlignment="Center"
+                                               Foreground="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=TreeViewItem}}"/>
+                                </StackPanel>
+                            </HierarchicalDataTemplate>
 
-                                <Style TargetType="TreeViewItem">
-                                    <Setter Property="ContextMenu" Value="{StaticResource TreeViewItemContextMenu}"/>
-                                    <EventSetter Event="ContextMenuOpening" Handler="TreeViewItem_ContextMenuOpening"/>
-                                    <EventSetter Event="PreviewMouseRightButtonDown" Handler="TreeViewItem_PreviewMouseRightButtonDown"/>
-                                    <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
-                                    <Setter Property="Foreground" Value="Black"/>
-                                    <Setter Property="Background" Value="Transparent"/>
-                                    <Setter Property="BorderBrush" Value="Transparent"/>
-                                    <Setter Property="Padding" Value="5,3"/>
-                                    <Setter Property="Margin" Value="0,1"/>
+                            <Style TargetType="TreeViewItem">
+                                <Setter Property="ContextMenu" Value="{StaticResource TreeViewItemContextMenu}"/>
+                                <EventSetter Event="ContextMenuOpening" Handler="TreeViewItem_ContextMenuOpening"/>
+                                <EventSetter Event="PreviewMouseRightButtonDown" Handler="TreeViewItem_PreviewMouseRightButtonDown"/>
+                                <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                                <Setter Property="Foreground" Value="Black"/>
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Setter Property="BorderBrush" Value="Transparent"/>
+                                <Setter Property="Padding" Value="5,3"/>
+                                <Setter Property="Margin" Value="0,1"/>
 
-                                    <Setter Property="Template">
-                                        <Setter.Value>
-                                            <ControlTemplate TargetType="TreeViewItem">
-                                                <StackPanel>
-                                                    <Border x:Name="Bd"
-                                                            CornerRadius="4" 
-                                                            Background="{TemplateBinding Background}"
-                                                            BorderBrush="{TemplateBinding BorderBrush}"
-                                                            BorderThickness="{TemplateBinding BorderThickness}"
-                                                            Padding="{TemplateBinding Padding}"
-                                                            SnapsToDevicePixels="true">
-                                                        <StackPanel Orientation="Horizontal">
-                                                            <ToggleButton x:Name="Expander" 
-                                                                          Style="{StaticResource TreeViewToggleButton}"
-                                                                          IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}}" 
-                                                                          ClickMode="Press"/>
-                                                            <ContentPresenter x:Name="PART_Header" 
-                                                                              ContentSource="Header" 
-                                                                              VerticalAlignment="Center"/>
-                                                        </StackPanel>
-                                                    </Border>
-
-                                                    <ItemsPresenter x:Name="ItemsHost"
-                                                                    Margin="25,0,0,0" Visibility="Collapsed"/>
-                                                </StackPanel>
-
-                                                <ControlTemplate.Triggers>
-                                                    <Trigger Property="IsExpanded" Value="True">
-                                                        <Setter TargetName="ItemsHost" Property="Visibility" Value="Visible"/>
-                                                    </Trigger>
-                                                    <Trigger Property="HasItems" Value="False">
-                                                        <Setter TargetName="Expander" Property="Visibility" Value="Hidden"/>
-                                                    </Trigger>
-
-                                                    <Trigger Property="IsSelected" Value="True">
-                                                        <Setter TargetName="Bd" Property="Background" Value="#3898FA"/>
-                                                        <Setter Property="Foreground" Value="White"/>
-                                                    </Trigger>
-                                                    <MultiTrigger>
-                                                        <MultiTrigger.Conditions>
-                                                            <Condition Property="IsMouseOver" Value="True" />
-                                                            <Condition Property="IsSelected" Value="False" />
-                                                        </MultiTrigger.Conditions>
-                                                        <Setter TargetName="Bd" Property="Background" Value="#F0F0F0"/>
-                                                        <Setter Property="Foreground" Value="Black"/>
-                                                    </MultiTrigger>
-                                                </ControlTemplate.Triggers>
-                                            </ControlTemplate>
-                                        </Setter.Value>
-                                    </Setter>
-                                </Style>
-                            </TreeView.Resources>
-                        </TreeView>
-                    </GroupBox>
-                </Grid>
-
-                <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Background="#DDD" ResizeBehavior="PreviousAndNext"/>
-
-                <!-- TabControl (Right Panel) -->
-                <Grid Grid.Column="2">
-                    <TabControl x:Name="TestCaseTabControl" 
-                                Margin="5"
-                                SelectionChanged="TestCaseTabControl_SelectionChanged">
-                        <TabControl.Resources>
-                            <Style TargetType="TabItem">
-                                <Setter Property="HeaderTemplate">
+                                <Setter Property="Template">
                                     <Setter.Value>
-                                        <DataTemplate>
-                                            <StackPanel Orientation="Horizontal">
-                                                <TextBlock Text="{Binding}" 
-                                                           VerticalAlignment="Center" 
-                                                           Margin="0,0,10,0"/>
-                                                <Button Content="✕" 
-                                                        FontSize="12"
-                                                        Width="20" 
-                                                        Height="20"
-                                                        Background="Transparent"
-                                                        BorderThickness="0"
-                                                        Foreground="Gray"
-                                                        Cursor="Hand"
-                                                        ToolTip="Close tab"
-                                                        Click="CloseTab_Click"
-                                                        Tag="{Binding RelativeSource={RelativeSource AncestorType=TabItem}}">
-                                                    <Button.Style>
-                                                        <Style TargetType="Button">
-                                                            <Setter Property="Background" Value="Transparent"/>
-                                                            <Style.Triggers>
-                                                                <Trigger Property="IsMouseOver" Value="True">
-                                                                    <Setter Property="Background" Value="#FFE0E0E0"/>
-                                                                    <Setter Property="Foreground" Value="Red"/>
-                                                                </Trigger>
-                                                            </Style.Triggers>
-                                                        </Style>
-                                                    </Button.Style>
-                                                </Button>
+                                        <ControlTemplate TargetType="TreeViewItem">
+                                            <StackPanel>
+                                                <Border x:Name="Bd"
+                                                        CornerRadius="4" 
+                                                        Background="{TemplateBinding Background}"
+                                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                                        BorderThickness="{TemplateBinding BorderThickness}"
+                                                        Padding="{TemplateBinding Padding}"
+                                                        SnapsToDevicePixels="true">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <ToggleButton x:Name="Expander" 
+                                                                      Style="{StaticResource TreeViewToggleButton}"
+                                                                      IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}}" 
+                                                                      ClickMode="Press"/>
+                                                        <ContentPresenter x:Name="PART_Header" 
+                                                                          ContentSource="Header" 
+                                                                          VerticalAlignment="Center"/>
+                                                    </StackPanel>
+                                                </Border>
+
+                                                <ItemsPresenter x:Name="ItemsHost"
+                                                                Margin="25,0,0,0" 
+                                                                Visibility="Collapsed"/>
                                             </StackPanel>
-                                        </DataTemplate>
+
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsExpanded" Value="True">
+                                                    <Setter TargetName="ItemsHost" Property="Visibility" Value="Visible"/>
+                                                </Trigger>
+                                                <Trigger Property="HasItems" Value="False">
+                                                    <Setter TargetName="Expander" Property="Visibility" Value="Hidden"/>
+                                                </Trigger>
+
+                                                <Trigger Property="IsSelected" Value="True">
+                                                    <Setter TargetName="Bd" Property="Background" Value="#3898FA"/>
+                                                    <Setter Property="Foreground" Value="White"/>
+                                                </Trigger>
+                                                <MultiTrigger>
+                                                    <MultiTrigger.Conditions>
+                                                        <Condition Property="IsMouseOver" Value="True" />
+                                                        <Condition Property="IsSelected" Value="False" />
+                                                    </MultiTrigger.Conditions>
+                                                    <Setter TargetName="Bd" Property="Background" Value="#F0F0F0"/>
+                                                    <Setter Property="Foreground" Value="Black"/>
+                                                </MultiTrigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
                                     </Setter.Value>
                                 </Setter>
                             </Style>
-                        </TabControl.Resources>
-
-                        <TabItem Header="🏠 Welcome" x:Name="WelcomeTab">
-                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                <TextBlock Text="Chào mừng! Vui lòng chọn một file từ cây bên trái."
-                                           FontSize="18" HorizontalAlignment="Center"
-                                           TextWrapping="Wrap" Foreground="Gray"/>
-                                <TextBlock Text="Hoặc tạo Test Case mới từ menu File."
-                                           FontSize="14" HorizontalAlignment="Center"
-                                           TextWrapping="Wrap" Foreground="DarkGray" Margin="0,10,0,0"/>
-                            </StackPanel>
-                        </TabItem>
-                    </TabControl>
-                </Grid>
+                        </TreeView.Resources>
+                    </TreeView>
+                </GroupBox>
             </Grid>
 
-            <!-- ✅ Horizontal Splitter -->
-            <GridSplitter Grid.Row="1" 
-                          Height="5" 
-                          HorizontalAlignment="Stretch" 
-                          VerticalAlignment="Stretch" 
-                          Background="#DDD" 
-                          ResizeBehavior="PreviousAndNext"/>
+            <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Background="#DDD" ResizeBehavior="PreviousAndNext"/>
 
-            <!-- ✅ Log Viewer Panel (Bottom) -->
-            <Border Grid.Row="2" 
-                    x:Name="LogPanel"
-                    BorderBrush="#CCC" 
-                    BorderThickness="0,1,0,0"
-                    Background="White">
-                <controls:LogViewerControl x:Name="LogViewer"/>
-            </Border>
+            <Grid Grid.Column="2">
+                <Border Margin="0,5,5,5" Background="White" BorderBrush="#CCC" BorderThickness="1" CornerRadius="3">
+                    <ContentControl x:Name="MainContentArea" Margin="10">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="5"/>
+                                <RowDefinition Height="250"/>
+                            </Grid.RowDefinitions>
+
+                            <StackPanel Grid.Row="0" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+
+                            <GridSplitter Grid.Row="1" Height="5" HorizontalAlignment="Stretch" VerticalAlignment="Center" Background="LightGray" ResizeBehavior="PreviousAndNext"/>
+
+                            <controls:LogViewerControl Grid.Row="2" />
+
+                        </Grid>
+                    </ContentControl>
+                </Border>
+            </Grid>
         </Grid>
     </DockPanel>
 </Window>

@@ -1,9 +1,10 @@
 ﻿using Common.Logging;
 using Microsoft.Win32;
+using System;
 using System.Windows;
 using WpfUI.Properties;
 
-namespace WpfUI.Dialogs
+namespace WpfUI.Dialogs 
 {
     public partial class ConfigWindow : Window
     {
@@ -44,15 +45,16 @@ namespace WpfUI.Dialogs
         {
             try
             {
+                string newProtocol = (RbTcp.IsChecked == true) ? "TCP" : "HTTP";
+
                 Settings.Default.ClientExePath = TxtClientPath.Text;
                 Settings.Default.ServerExePath = TxtServerPath.Text;
-                Settings.Default.Protocol = (RbTcp.IsChecked == true) ? "TCP" : "HTTP";
-
+                Settings.Default.Protocol = newProtocol;
                 Settings.Default.Save();
 
-                LogManager.Instance.LogInfomation($"Configuration updated. Protocol={Settings.Default.Protocol}");
+                LogManager.Instance.LogInfomation($"Global Configuration updated. Protocol={newProtocol}");
 
-                this.DialogResult = true;
+                this.DialogResult = true; 
                 this.Close();
             }
             catch (Exception ex)

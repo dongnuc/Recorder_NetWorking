@@ -1,23 +1,14 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Shapes;
 using WpfUI.Properties;
 using System.IO;
 using WpfUI.ViewModels;
 using FileManagement.FolderHelper;
+using FileManagement.FileHelper;
 using FileManagement.FileHelper.FileHandler;
 using Common.Interfaces.IOFile;
-using Microsoft.Win32; 
+using Microsoft.Win32;
 
 namespace WpfUI
 {
@@ -25,14 +16,19 @@ namespace WpfUI
     {
         private readonly IOFolderHandler _folderHandler;
         private readonly IOFileHandler _fileHandler;
+        private readonly IOFileManagement _fileManager;
+        
 
         public ProjectExplorerWindow()
         {
             InitializeComponent();
             _folderHandler = new FolderHandler();
             _fileHandler = new ExcelExecution();
+            _fileManager = new FileManage(_fileHandler);
+
             LoadRecentProject();
         }
+
 
         private void LoadRecentProject()
         {
@@ -51,10 +47,10 @@ namespace WpfUI
 
         private void BtnCreateNew_Click(object sender, RoutedEventArgs e)
         {
-            var setupWindow = new ProjectSetupWindow();
+            var setupWindow = new ProjectSetupWindow(_folderHandler, _fileHandler);
 
             this.Hide();
-            var result = setupWindow.ShowDialog();
+            setupWindow.ShowDialog();
 
             if (setupWindow.ProjectCreatedSuccessfully)
             {
@@ -82,8 +78,10 @@ namespace WpfUI
                     MessageBox.Show("Đường dẫn project không hợp lệ.", "Error");
                     return;
                 }
+
                 Settings.Default.ProjectPath = projectRoot;
                 Settings.Default.Save();
+
                 OpenMainMenu(projectRoot);
             }
         }
@@ -120,8 +118,10 @@ namespace WpfUI
             this.Hide();
 
             var mainMenu = new MainMenu(viewModel);
+
             mainMenu.Closed += MainMenu_Closed;
             mainMenu.Show();
+
             LstRecentProjects.SelectedItem = null;
         }
 
