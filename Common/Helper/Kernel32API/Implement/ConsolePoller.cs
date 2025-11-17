@@ -120,10 +120,11 @@ namespace Common.Helper.Kernel32API
                     int lineLength = Math.Min(info.dwSize.X, currentBuffer.Length - start);
                     string line = currentBuffer.Substring(start, lineLength).TrimEnd();
 
-                    if (!string.IsNullOrEmpty(line))
-                    {
-                        lines.Add(line);
-                    }
+                    //if (!string.IsNullOrEmpty(line))
+                    //{
+                    //    lines.Add(line);
+                    //}
+                    lines.Add(line);
                 }
 
                 string result = string.Join(Environment.NewLine, lines);

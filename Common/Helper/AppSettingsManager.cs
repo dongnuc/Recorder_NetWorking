@@ -32,7 +32,20 @@ namespace Common.Helper
         #endregion
 
         #region Update Port
-
+        private bool IsFileLocked(string filePath)
+        {
+            try
+            {
+                using (FileStream stream = File.Open(filePath, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+                {
+                    return false;
+                }
+            }
+            catch (IOException)
+            {
+                return true;
+            }
+        }
         /// <summary>
         /// Update the Port value in appsettings.json
         /// </summary>
@@ -43,6 +56,12 @@ namespace Common.Helper
         {
             try
             {
+                if (IsFileLocked(_filePath))
+                {
+                    LogManager.Instance.LogError($"   File is locked: {_filePath}");
+                    LogManager.Instance.LogError($"   Close any applications using this file");
+                    return false;
+                }
                 // Validate port
                 if (newPort < 1 || newPort > 65535)
                 {
@@ -81,7 +100,7 @@ namespace Common.Helper
                 string updatedJson = jsonNode.ToJsonString(_jsonOptions);
                 File.WriteAllText(_filePath, updatedJson);
 
-                LogManager.Instance.LogInfomation($"✅ Updated Port to {newPort} in {Path.GetFileName(_filePath)}");
+                LogManager.Instance.LogInfomation($"Updated Port to {newPort} in {Path.GetFileName(_filePath)}");
                 return true;
             }
             catch (Exception ex)
@@ -91,6 +110,44 @@ namespace Common.Helper
             }
         }
         #endregion
+        public static bool UpdateAppSettings(string clientPath, int clientPort, string serverPath, int serverPort)
+        {
+            try
+            {
+                // Get or create appsettings.json for client
+                string clientAppSettings = AppSettingsPathResolver.GetAppSettingsPath(clientPath);
+                if (string.IsNullOrEmpty(clientAppSettings))
+                {
+                    LogManager.Instance.LogWarning("Client appsettings.json not found, creating default...");
+                }
+                else
+                {
+                    var clientManager = new AppSettingsManager(clientAppSettings);
+                    clientManager.UpdatePort(clientPort, createBackup: true);
+                    LogManager.Instance.LogInfomation($" Client appsettings updated - Port: {clientPort}");
+                }
+
+                // Get or create appsettings.json for server
+                string serverAppSettings = AppSettingsPathResolver.GetAppSettingsPath(serverPath);
+                if (string.IsNullOrEmpty(serverAppSettings))
+                {
+                    LogManager.Instance.LogWarning("Server appsettings.json not found, creating default...");
+                }
+                else
+                {
+                    var serverManager = new AppSettingsManager(serverAppSettings);
+                    serverManager.UpdatePort(serverPort, createBackup: true);
+                    LogManager.Instance.LogInfomation($"✅ Server appsettings updated - Port: {serverPort}");
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                LogManager.Instance.LogError($"Failed to update appsettings: {ex.Message}");
+                return false;
+            }
+        }
 
 
         #region Backup & Restore
@@ -105,7 +162,7 @@ namespace Common.Helper
                 string backupPath = $"{_filePath}.backup_{DateTime.Now:yyyyMMdd_HHmmss}";
                 File.Copy(_filePath, backupPath, overwrite: true);
 
-                LogManager.Instance.LogInfomation($"📦 Backup created: {Path.GetFileName(backupPath)}");
+                LogManager.Instance.LogInfomation($" Backup created: {Path.GetFileName(backupPath)}");
                 return backupPath;
             }
             catch (Exception ex)

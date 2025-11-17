@@ -277,7 +277,7 @@ namespace Common.Helper
             }
 
             // Lấy tất cả dòng từ dòng 2 trở đi
-            var outputLines = lines.Skip(1).Where(l => !string.IsNullOrWhiteSpace(l));
+            var outputLines = lines.Skip(1);
             string output = string.Join(Environment.NewLine, outputLines);
 
             return (firstLine, output);

@@ -1,4 +1,5 @@
 ﻿using Common.Interfaces.IOFile;
+using Common.Interfaces.Services;
 using Common.Logging;
 using FileManagement.FileHelper.FileHandler;
 using FileManagement.FolderHelper;
@@ -16,13 +17,18 @@ namespace WpfUI
     {
         private readonly IOFolderHandler _folderHandler;
         private readonly IOFileHandler _fileHandler;
-
-        public ProjectSetupWindow()
+        private readonly IServiceProvider _serviceProvider;
+        private readonly IOFileManagement _fileManagement;
+        public ProjectSetupWindow(IOFileHandler fileHandler,
+        IServiceProvider serviceProvider,
+        IOFileManagement fileManagement)
         {
             InitializeComponent();
             ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
             _folderHandler = new FolderHandler();
             _fileHandler = new ExcelExecution();
+            _serviceProvider = serviceProvider;
+            _fileManagement = fileManagement;
             LogManager.Instance.LogInfomation("🚀 ProjectSetupWindow opened");
 
             LoadSettings();
@@ -76,7 +82,7 @@ namespace WpfUI
                     _fileHandler,
                     projectRoot
                 );
-                var mainMenu = new MainMenu(mainViewModel);
+                var mainMenu = new MainMenu(mainViewModel,_fileHandler,_serviceProvider,_fileManagement);
                 mainMenu.Show();
 
                 this.Close();

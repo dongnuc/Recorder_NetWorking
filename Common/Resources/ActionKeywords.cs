@@ -2,7 +2,6 @@
 {
     public static class ActionKeywords
     {
-        public const string START = "Start";
         public const string INPUT = "Input";
         public const string START_SERVER = "StartServer";
         public const string START_CLIENT= "StartClient";

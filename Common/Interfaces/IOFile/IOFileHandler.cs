@@ -1,10 +1,4 @@
-﻿using Common.Models.Entities;
-using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.ComponentModel;
 
 namespace Common.Interfaces.IOFile
 {
@@ -22,6 +16,8 @@ namespace Common.Interfaces.IOFile
         string GetCellValue(string excelPath, string sheetName, int row, int column);
         Task AppendNewColumn(string excelPath, string sheetName, string name, string description);
         void DeleteColumn(string excelPath, string sheetName, int columnToDelete);
+        void ExportToExcelParams(string filePath, params (string SheetName, ICollection<object> Data)[] sheetsData);
+
 
     }
 }

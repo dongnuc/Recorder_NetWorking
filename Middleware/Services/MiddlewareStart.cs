@@ -3,36 +3,10 @@ using Common.Logging;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using static Common.Models.Entities.MiddlewareModel;
 
 namespace Middleware.Services
 {
-    #region Data Models
-
-    public class NetworkTransaction
-    {
-        public string Protocol { get; set; }
-        public NetworkRequest Request { get; set; }
-        public NetworkResponse Response { get; set; }
-    }
-
-    public class NetworkRequest
-    {
-        public string Method { get; set; }
-        public string Url { get; set; }
-        public string Body { get; set; }
-        public string DataType { get; set; }
-        public string ByteSize { get; set; }
-    }
-
-    public class NetworkResponse
-    {
-        public string StatusCode { get; set; }
-        public string Body { get; set; }
-        public string DataType { get; set; }
-        public string ByteSize { get; set; }
-    }
-
-    #endregion
 
     public class MiddlewareStart
     {
@@ -102,19 +76,51 @@ namespace Middleware.Services
 
                 _isSessionRunning = false;
                 _cts?.Cancel();
-                _cts?.Dispose();
+                await Task.Delay(1000);
 
-                if (_httpListener != null && _httpListener.IsListening)
+                if (_httpListener != null)
                 {
-                    _httpListener.Stop();
-                    _httpListener.Close();
-                    _httpListener = null;
+                    try
+                    {
+                        if (_httpListener.IsListening)
+                        {
+                            _httpListener.Stop();
+                            LogManager.Instance.LogDebug("HTTP Listener stopped");
+                        }
+                        _httpListener.Close();
+                        _httpListener = null;
+                    }
+                    catch (ObjectDisposedException)
+                    {
+                        LogManager.Instance.LogDebug("HTTP Listener already disposed");
+                    }
+                    catch (Exception ex)
+                    {
+                        LogManager.Instance.LogWarning($"Error stopping HTTP Listener: {ex.Message}");
+                    }
                 }
 
                 if (_tcpListener != null)
                 {
-                    _tcpListener.Stop();
-                    _tcpListener = null;
+                    try
+                    {
+                        _tcpListener.Stop();
+                        _tcpListener = null;
+                        LogManager.Instance.LogDebug("TCP Listener stopped");
+                    }
+                    catch (Exception ex)
+                    {
+                        LogManager.Instance.LogWarning($"Error stopping TCP Listener: {ex.Message}");
+                    }
+                }
+                try
+                {
+                    _cts?.Dispose();
+                    _cts = null;
+                }
+                catch (Exception ex)
+                {
+                    LogManager.Instance.LogWarning($"Error disposing CTS: {ex.Message}");
                 }
 
                 LogManager.Instance.LogInfomation(" Middleware stopped");
@@ -130,8 +136,6 @@ namespace Middleware.Services
         #endregion
 
         #region HTTP Proxy
-
-
         private void StartHttpProxy(CancellationToken token)
         {
             try
@@ -195,9 +199,6 @@ namespace Middleware.Services
                     ByteSize = requestBytes.Length.ToString()
                 };
 
-                // 🔔 Raise event: Request captured
-                OnRequestCaptured?.Invoke(transaction.Request);
-
                 LogManager.Instance.LogDebug($" HTTP Request: {request.HttpMethod} {request.Url}");
 
                 // 2. Forward to real server
@@ -220,14 +221,11 @@ namespace Middleware.Services
                 // 3. Capture Response (Server → Client)
                 transaction.Response = new NetworkResponse
                 {
-                    StatusCode = ((int)responseMessage.StatusCode).ToString(),
+                    StatusCode = (responseMessage.StatusCode).ToString(),
                     Body = responseBody,
                     DataType = DataInspector.DetecDataType(responseBytes),
                     ByteSize = responseBytes.Length.ToString()
                 };
-
-                // 🔔 Raise event: Response captured
-                OnResponseCaptured?.Invoke(transaction.Response);
 
                 LogManager.Instance.LogDebug($" HTTP Response: {responseMessage.StatusCode}");
 
@@ -308,6 +306,10 @@ namespace Middleware.Services
                 Response = new NetworkResponse { StatusCode = "OK" }
             };
 
+            //  Lock để đảm bảo chỉ raise event 1 lần
+            var transactionLock = new object();
+            bool transactionCompleted = false;
+
             try
             {
                 using (client)
@@ -318,30 +320,85 @@ namespace Middleware.Services
                     using var clientStream = client.GetStream();
                     using var serverStream = server.GetStream();
 
-                    var c2s = RelayTcpDataAsync(clientStream, serverStream, transaction.Request, token);
-                    var s2c = RelayTcpDataAsync(serverStream, clientStream, transaction.Response, token);
+                    var c2s = RelayTcpDataAsync(
+                        clientStream,
+                        serverStream,
+                        transaction.Request,
+                        token,
+                        onComplete: null 
+                    );
 
-                    await Task.WhenAny(c2s, s2c);
+                    var s2c = RelayTcpDataAsync(
+                        serverStream,
+                        clientStream,
+                        transaction.Response,
+                        token,
+                        onComplete: () =>
+                        {
+                            //  Callback khi RESPONSE hoàn thành
+                            lock (transactionLock)
+                            {
+                                if (!transactionCompleted)
+                                {
+                                    transactionCompleted = true;
+
+                                    // Kiểm tra có data không
+                                    bool hasRequestData = !string.IsNullOrWhiteSpace(transaction.Request?.Body);
+                                    bool hasResponseData = !string.IsNullOrWhiteSpace(transaction.Response?.Body);
+
+                                    if (hasRequestData && hasResponseData)
+                                    {
+                                        LogManager.Instance.LogInfomation("🎉 Transaction completed - Request & Response received");
+                                        OnTransactionCompleted?.Invoke(transaction);
+                                    }
+                                    else
+                                    {
+                                        LogManager.Instance.LogDebug($"⚠️ Incomplete transaction - Request: {hasRequestData}, Response: {hasResponseData}");
+                                    }
+                                }
+                            }
+                        }
+                    );
                 }
-
-                // 🔔 Raise event: Complete transaction
-                OnTransactionCompleted?.Invoke(transaction);
             }
             catch (Exception ex)
             {
                 LogManager.Instance.LogError($"TCP connection error: {ex.Message}");
-                transaction.Response.Body = $"TCP Error: {ex.Message}";
-                OnTransactionCompleted?.Invoke(transaction);
+
+                lock (transactionLock)
+                {
+                    if (!transactionCompleted && !string.IsNullOrWhiteSpace(transaction.Request?.Body))
+                    {
+                        transaction.Response.Body = $"TCP Error: {ex.Message}";
+                        OnTransactionCompleted?.Invoke(transaction);
+                    }
+                }
             }
         }
 
-        private async Task RelayTcpDataAsync(NetworkStream from, NetworkStream to, object dataTarget, CancellationToken token)
+        private async Task RelayTcpDataAsync(
+            NetworkStream from,
+            NetworkStream to,
+            object dataTarget,
+            CancellationToken token,
+            Action onComplete = null) //  Callback khi hoàn thành
         {
             var buffer = new byte[8192];
             int read;
+            bool hasReceivedData = false;
 
             while ((read = await from.ReadAsync(buffer, 0, buffer.Length, token)) > 0)
             {
+
+                if (read == 0)
+                {
+                    if (hasReceivedData)
+                    {
+                        LogManager.Instance.LogDebug("📭 Stream closed after receiving data");
+                    }
+                    break;
+                }
+                hasReceivedData = true;
                 await to.WriteAsync(buffer, 0, read, token);
 
                 var data = Encoding.UTF8.GetString(buffer, 0, read);
@@ -353,8 +410,6 @@ namespace Middleware.Services
                     request.Body = (request.Body ?? "") + data;
                     request.DataType = dataType;
                     request.ByteSize += read;
-
-                    OnRequestCaptured?.Invoke(request);
                 }
                 else if (dataTarget is NetworkResponse response)
                 {
@@ -362,12 +417,11 @@ namespace Middleware.Services
                     response.Body = (response.Body ?? "") + data;
                     response.DataType = dataType;
                     response.ByteSize += read;
-
-                    OnResponseCaptured?.Invoke(response);
+                    onComplete?.Invoke();
                 }
             }
-        }
 
+        }
         #endregion
     }
 }

@@ -1,155 +1,28 @@
-﻿﻿﻿using Common.Helper.Kernel32API;
+﻿using Common.Helper;
+using Common.Helper.Kernel32API;
+using Common.Interfaces.IOFile;
+using Common.Interfaces.Services;
 using Common.Logging;
 using Common.Models.Entities;
 using Common.Resources;
+using FileManagement.FileHelper.FileHandler;
 using Middleware.Services;
-using OfficeOpenXml;
-using OfficeOpenXml.Style;
-using ProcessManagement.Services;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
-using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Windows;
-using LicenseContext = OfficeOpenXml.LicenseContext;
+using System.Windows.Data;
+using static Common.Models.Entities.MiddlewareModel;
+using File = System.IO.File;
 
 namespace WpfUI
 {
-    #region
-    public class ExcelExporter
-    {
-        public ExcelExporter()
-        {
-            ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
-        }
-        public void ExportToExcelParams(string filePath, params (string SheetName, ICollection<object> Data)[] sheetsData)
-        {
-            try
-            {
-                if (sheetsData == null || sheetsData.Length == 0)
-                    throw new ArgumentException("Không có dữ liệu để xuất.");
-
-                var dir = Path.GetDirectoryName(filePath);
-                if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
-                    Directory.CreateDirectory(dir);
-
-                ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
-
-                using var package = new ExcelPackage();
-
-                foreach (var (sheetName, data) in sheetsData)
-                {
-                    if (data == null || !data.Any()) continue;
-
-                    var firstItem = data.FirstOrDefault(d => d != null);
-                    if (firstItem == null) continue;
-
-                    var worksheet = package.Workbook.Worksheets.Add(sheetName);
-
-                    var properties = firstItem.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance);
-
-                    // ===== HEADER =====
-                    for (int i = 0; i < properties.Length; i++)
-                    {
-                        worksheet.Cells[1, i + 1].Value = properties[i].Name;
-                    }
-
-                    using (var headerRange = worksheet.Cells[1, 1, 1, properties.Length])
-                    {
-                        headerRange.Style.Font.Bold = true;
-                    }
-
-
-                    // Thay thế LoadFromCollection bằng vòng lặp thủ công để đảm bảo hoạt động với ICollection<object>
-                    if (data.Any())
-                    {
-                        int currentRow = 2;
-                        foreach (var item in data)
-                        {
-                            if (item == null) continue;
-                            for (int i = 0; i < properties.Length; i++)
-                            {
-                                var value = properties[i].GetValue(item);
-                                worksheet.Cells[currentRow, i + 1].Value = value;
-                            }
-                            currentRow++;
-                        }
-                    }
-
-                    // ===== TÙY CHỈNH CỘT (Giữ nguyên) =====
-                    const double MAX_COLUMN_WIDTH = 60;
-                    const double MIN_COLUMN_WIDTH = 10;
-
-                    for (int i = 1; i <= properties.Length; i++)
-                    {
-                        var column = worksheet.Column(i);
-                        var propertyName = properties[i - 1].Name;
-                        column.Style.WrapText = true;
-                        if ((propertyName.Equals("DataResponse", StringComparison.OrdinalIgnoreCase))
-                            || (propertyName.Equals("Output", StringComparison.OrdinalIgnoreCase)))
-                        {
-                            column.Style.WrapText = true;
-                            column.Width = MAX_COLUMN_WIDTH;
-                        }
-                        else if ((propertyName.Equals("DataTypeMiddleWare", StringComparison.OrdinalIgnoreCase)) ||
-                            (propertyName.Equals("DataRequest", StringComparison.OrdinalIgnoreCase)))
-                        {
-                            column.Style.WrapText = true;
-                            column.Width = MIN_COLUMN_WIDTH * 2;
-                        }
-                        else
-                        {
-                            column.AutoFit();
-                        }
-
-                        if (column.Width > MAX_COLUMN_WIDTH) column.Width = MAX_COLUMN_WIDTH;
-                        if (column.Width < MIN_COLUMN_WIDTH) column.Width = MIN_COLUMN_WIDTH;
-                    }
-
-                    if (worksheet.Dimension != null)
-                    {
-                        worksheet.Cells[worksheet.Dimension.Address].Style.VerticalAlignment = ExcelVerticalAlignment.Top;
-                    }
-                }
-
-                package.SaveAs(new FileInfo(filePath));
-
-                MessageBox.Show(
-                    $"Xuất file Excel thành công!\nĐường dẫn: {filePath}",
-                    "Thành công",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information
-                );
-            }
-            catch (Exception ex)
-            {
-                // ... (phần xử lý lỗi giữ nguyên)
-                try
-                {
-                    string logPath = Path.Combine(Path.GetDirectoryName(filePath) ?? AppDomain.CurrentDomain.BaseDirectory, "ExportLog.txt");
-                    File.AppendAllText(logPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Lỗi khi export Excel:\n{ex}\n\n");
-                    MessageBox.Show($"Xuất Excel thất bại!\nChi tiết lỗi đã được ghi tại:\n{logPath}", "Lỗi Xuất File", MessageBoxButton.OK, MessageBoxImage.Error);
-                }
-                catch
-                {
-                    MessageBox.Show($"Xuất Excel thất bại: {ex.Message}", "Lỗi Xuất File", MessageBoxButton.OK, MessageBoxImage.Error);
-                }
-            }
-        }
-
-
-    }
-    #endregion
-
-
     public partial class RecorderWindow : Window, INotifyPropertyChanged
     {
-        #region Fields
+        #region Fields Process
 
-        private ProcessManager _processManager;
-
-        // ✅ Changed from Task<string> to CancellationTokenSource
+        private IProcessManager _processManager;
         private ChildProcess _clientChild;
         private IntPtr _clientMutex;
         private CancellationTokenSource _clientCts;
@@ -162,14 +35,13 @@ namespace WpfUI
         private readonly string _testCaseName;
         private readonly string _clientPath;
         private readonly string _serverPath;
-
-        // store NetwoekTransaction when middleware raised event
-        private readonly Queue<NetworkTransaction> _pendingTransactions = new();
-        private readonly object _transactionLock = new object();
+        private readonly bool _isHttp;
+        private bool _isClosing = false;
 
         #endregion
 
-        #region Properties
+        #region Properties UI
+
         private TestStage _selectedStageData = new TestStage();
         public TestStage SelectedStageData
         {
@@ -183,7 +55,8 @@ namespace WpfUI
                 }
             }
         }
-        public Dictionary<int, TestStage> TestStages = new Dictionary<int, TestStage>();
+        public Dictionary<int, TestStage> TestStages => _testkitManagerService?.GetCurrentTestStages() ?? new Dictionary<int, TestStage>();
+
         private ObservableCollection<int> _stageKeys = new ObservableCollection<int>();
         public ObservableCollection<int> StageKeys
         {
@@ -206,399 +79,192 @@ namespace WpfUI
                     _selectedStageKey = value;
                     OnPropertyChanged();
 
-                    // ✅ Update SelectedStageData khi user chọn stage khác
-                    if (TestStages.TryGetValue(value, out var stage))
+                    //  Lấy data từ TestkitManagerService
+                    var testStages = _testkitManagerService?.GetCurrentTestStages();
+                    if (testStages != null && testStages.TryGetValue(value, out var stage))
                     {
                         SelectedStageData = stage;
-                        LogManager.Instance.LogDebug($"📍 Switched to Stage {value}");
+                        LogManager.Instance.LogDebug($"Stage {value} selected - Data loaded");
+                    }
+                    else
+                    {
+                        LogManager.Instance.LogWarning($"Stage {value} not found in TestkitManagerService");
                     }
                 }
             }
         }
-        private TestStage CurrentTestStage
-        {
-            get
-            {
-                if (TestStages.TryGetValue(_currentStageIndex, out var stage))
-                {
-                    return stage;
-                }
 
-                LogManager.Instance.LogWarning($"⚠️ Stage {_currentStageIndex} not found, creating new one");
-                var newStage = new TestStage();
-                TestStages[_currentStageIndex] = newStage;
-                return newStage;
+        private int _pendingTransactionCount = 0;
+        public int PendingTransactionCount
+        {
+            get => _pendingTransactionCount;
+            set
+            {
+                if (_pendingTransactionCount != value)
+                {
+                    _pendingTransactionCount = value;
+                    OnPropertyChanged(nameof(PendingTransactionCount));
+                }
             }
         }
-
         #endregion
+
+        private bool _isClientRunning = false;
+        private bool _isServerRunning = false;
+        private bool _isMiddlewareRunning = false;
+        private int _proxyPort = -1;
+        private int _serverPort = -1;
+        private string _testcasePath = string.Empty;
+        private IOFileHandler _fileHandler;
+        private readonly ITestkitManagerService _testkitManagerService;
+        private readonly object _middlewareLock = new object();
 
         #region Constructor
 
-        public RecorderWindow(string testCaseName, string clientPath, string serverPath)
+        public RecorderWindow(string testcasePath, string testCaseName,
+            string clientPath, string serverPath, bool isHttp,
+            IProcessManager processManager, IOFileHandler fileHandler,
+            ITestkitManagerService testkitManagerService)
         {
+            LogManager.Instance.LogDebug($"RecorderWindow ctor: this={this.GetHashCode()} - creating TestStages (initial count: {TestStages.Count})");
             InitializeComponent();
-            _processManager = new ProcessManager();
+
+            _testcasePath = testcasePath;
             _testCaseName = testCaseName;
             _clientPath = clientPath;
             _serverPath = serverPath;
-
+            _isHttp = isHttp;
+            _fileHandler = fileHandler;
+            _processManager = processManager;
+            _testkitManagerService = testkitManagerService;
 
             DataContext = this;
-            TestStages = new Dictionary<int, TestStage>();
-            // Create TestStage
-            CreateInitialStage();
-            // Subscribe to data sources
             SubscribeToDataSources();
             LogManager.Instance.LogInfomation($"📝 Recorder window opened: {testCaseName}");
-            this.Loaded += RecorderWindow_Loaded;
         }
 
-        private async void RecorderWindow_Loaded(object sender, RoutedEventArgs e)
+        private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
+            this.DataContext = null;
+        }
+        public async Task InitializeAsync()
+        {
+            var (proxyPort, serverPort) = PortChecker.GetTwoAvailablePorts(8000, 9000);
+
+            if (!AppSettingsManager.UpdateAppSettings(_clientPath, proxyPort, _serverPath, serverPort))
+            {
+                MessageBox.Show("Failed to update appsettings.json. Check log for details.", "Error",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
+            _proxyPort = proxyPort; _serverPort = serverPort;
+
             await Task.Delay(500);
-            try
-            {
-                await StartProcessesAsync();
-            }
-            catch (Exception ex)
-            {
-                LogManager.Instance.LogError($"❌ Failed to start processes: {ex.Message}");
-                MessageBox.Show(
-                    $"Failed to start processes!\n\n{ex.Message}",
-                    "Startup Error",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error
-                );
-                this.Close();
-            }
-        }
-
-        /// <summary>
-        /// ✅ Tự động start Server và Client
-        /// </summary>
-        private async Task StartProcessesAsync()
-        {
-            try
-            {
-                if (!File.Exists(_clientPath))
-                {
-                    throw new FileNotFoundException($"Client executable not found: {_clientPath}");
-                }
-
-                if (!File.Exists(_serverPath))
-                {
-                    throw new FileNotFoundException($"Server executable not found: {_serverPath}");
-                }
-
-                var serverResult = await _processManager.StartSingleWithPollingAsync(
-                    _serverPath,
-                    "Server",
-                    isClient: false,
-                    showConsoleMessages: false
-                );
-
-                _serverChild = serverResult.child;
-                _serverMutex = serverResult.mutex;
-                _serverCts = serverResult.cts;
-
-                await Task.Delay(1500);
-
-                //Client
-                var clientResult = await _processManager.StartSingleWithPollingAsync(
-                    _clientPath,
-                    "Client",
-                    isClient: true,
-                    showConsoleMessages: false
-                );
-
-                //  ASSIGN to fields
-                _clientChild = clientResult.child;
-                _clientMutex = clientResult.mutex;
-                _clientCts = clientResult.cts;
-
-            }
-            catch (Exception ex)
-            {
-                LogManager.Instance.LogError($" Error starting processes: {ex.Message}");
-                LogManager.Instance.LogError($"   Stack: {ex.StackTrace}");
-                throw;
-            }
         }
 
         #endregion
 
-        #region Initial Stage Creation
-
-        /// <summary>
-        /// Create Stage 1 with "START" action on startup
-        /// This captures initial connection data before user input
-        /// </summary>
-        private void CreateInitialStage()
-        {
-            _currentStageIndex = 1;
-            var testStage = new TestStage();
-
-            _currentStageIndex = 1; // Start from stage 1
-
-            var initialInput = new InputClient
-            {
-                Stage = _currentStageIndex,
-                Action = ActionKeywords.START,
-                Input = string.Empty,
-                DataType = "System"
-            };
-
-            testStage.InputClients.Add(initialInput);
-
-            // Add to stage keys
-            TestStages[_currentStageIndex] = testStage;
-            StageKeys.Add(_currentStageIndex);
-            SelectedStageKey = _currentStageIndex;
-
-            SelectedStageData = testStage;
-
-            LogManager.Instance.LogInfomation($"✅ Initial stage created: Stage {_currentStageIndex} - {ActionKeywords.START}");
-        }
-
-        #endregion
 
         #region Subscribe to Data Sources
 
         private void SubscribeToDataSources()
         {
-            _processManager.OnUserInput += OnUserInput;
-            MiddlewareStart.Instance.OnTransactionCompleted += OnTransactionCompletedHandler;
-            _processManager.OnClientOutput += OnClientOutput;
-            _processManager.OnServerOutput += OnServerOutput;
-            LogManager.Instance.LogDebug("✅ Subscribed to data sources with sequential processing");
+            _testkitManagerService.OnStageCreated += OnStageCreated;
+            _testkitManagerService.OnStageUpdated += OnStageUpdated;
+            _testkitManagerService.OnStagesChanged += OnStagesChanged;
+            _testkitManagerService.OnTransactionReceived += OnTransactionReceived;
+            LogManager.Instance.LogDebug(" Subscribed to data sources with sequential processing");
         }
 
         private void UnsubscribeFromDataSources()
         {
-            MiddlewareStart.Instance.OnTransactionCompleted -= OnTransactionCompletedHandler;
-
-            if (_processManager != null)
+            if (_testkitManagerService != null)
             {
-                _processManager.OnUserInput -= OnUserInput;
-                _processManager.OnClientOutput -= OnClientOutput;
-                _processManager.OnServerOutput -= OnServerOutput;
+                _testkitManagerService.OnStageCreated -= OnStageCreated;
+                _testkitManagerService.OnStageUpdated -= OnStageUpdated;
+                _testkitManagerService.OnStagesChanged -= OnStagesChanged;
+                _testkitManagerService.OnTransactionReceived -= OnTransactionReceived;
+
             }
-            LogManager.Instance.LogDebug("❌ Unsubscribed from data sources");
+            LogManager.Instance.LogDebug(" Unsubscribed from data sources");
         }
 
         #endregion
 
         #region Event Handlers - ProcessManager
 
-        /// <summary>
-        /// ✅ FIXED: Handle user input and create NEW STAGE
-        /// </summary>
-        private void OnUserInput(string input, string dataType)
+        private void OnTransactionReceived(NetworkTransaction transaction)
         {
-            LogManager.Instance.LogDebug($"Data input{input}");
             Dispatcher.Invoke(() =>
             {
-                // ✅ Increment stage ONLY when user inputs (Enter key pressed)
-                _currentStageIndex++;
-                var newTestStage = new TestStage();
-
-                var inputClient = new InputClient
-                {
-                    Stage = _currentStageIndex,
-                    Action = ActionKeywords.INPUT,
-                    Input = input,
-                    DataType = dataType
-                };
-
-                newTestStage.InputClients.Add(inputClient);
-                TestStages[_currentStageIndex] = newTestStage;
-                // Add stage key
-                if (!StageKeys.Contains(_currentStageIndex))
-                {
-                    StageKeys.Add(_currentStageIndex);
-                    SelectedStageKey = _currentStageIndex;
-                }
-                SelectedStageKey = _currentStageIndex;
-                FlushPendingTransactions();
-                LogManager.Instance.LogInfomation($"📥 Stage {_currentStageIndex} - Input: {input}");
-                OnPropertyChanged(nameof(SelectedStageData));
+                PendingTransactionCount = _testkitManagerService.GetPendingTransactionCount();
             });
         }
 
         /// <summary>
-        /// ✅ FIXED: Append to existing OutputClient or create new one for current stage
-        /// All output in same stage will be combined
+        /// Handle user input and create NEW STAGE
         /// </summary>
-        private void OnClientOutput(string output)
+        private void OnStageCreated(int stageIndex)
         {
-            LogManager.Instance.LogDebug($"Data output client {output}");
-
             Dispatcher.Invoke(() =>
             {
-                try
-                {
-                    var currentStage = CurrentTestStage;
-                    var outputClient = currentStage.OutputClients
-                    .Where(o => o.Stage == _currentStageIndex)
-                    .FirstOrDefault();
+                LogManager.Instance.LogDebug($" Stage {stageIndex} created");
 
-                    if (outputClient != null)
-                    {
-                        outputClient.Output = output;
-                    }
-                    else
-                    {
-                        outputClient = new OutputClient
-                        {
-                            Stage = _currentStageIndex,
-                            Output = output
-                        };
-                        currentStage.OutputClients.Add(outputClient);
-                    }
-                    LogManager.Instance.LogDebug($"📤 Client output added to Stage {_currentStageIndex}: {output}");
-                    OnPropertyChanged(nameof(SelectedStageData));
-                }
-                catch (Exception ex)
+                // Add to stage keys if not exists
+                if (!StageKeys.Contains(stageIndex))
                 {
-                    LogManager.Instance.LogError($"❌ OnClientOutput error: {ex.Message}");
+                    StageKeys.Add(stageIndex);
                 }
 
+                // Select newly created stage
+                SelectedStageKey = stageIndex;
+
+                OnPropertyChanged(nameof(TestStages));
+
+                PendingTransactionCount = _testkitManagerService.GetPendingTransactionCount();
             });
         }
 
         /// <summary>
-        /// ✅ FIXED: Append to existing OutputServer or create new one for current stage
-        /// All output in same stage will be combined
+        /// Update single object properties in current stage
         /// </summary>
-        private void OnServerOutput(string output)
+        private void OnStageUpdated(int stageIndex)
         {
-            LogManager.Instance.LogDebug($"Data output server {output}");
-
             Dispatcher.Invoke(() =>
             {
-                try
+                LogManager.Instance.LogDebug($" Stage {stageIndex} updated");
+
+                // Refresh UI if currently viewing this stage
+                if (SelectedStageKey == stageIndex)
                 {
-                    var currentStage = CurrentTestStage;
-                    var outputServer = currentStage.OutputServers.Where(o => o.Stage == _currentStageIndex).FirstOrDefault();
-                    if (outputServer != null)
+                    var testStages = _testkitManagerService.GetCurrentTestStages();
+                    if (testStages.TryGetValue(stageIndex, out var stage))
                     {
-                        outputServer.Output = output;
+                        SelectedStageData = stage;
                     }
-                    else
-                    {
-                        outputServer = new OutputServer
-                        {
-                            Stage = _currentStageIndex,
-                            Output = output
-                        };
-                        currentStage.OutputServers.Add(outputServer);
-                    }
-                }
-                catch (Exception ex)
-                {
                 }
 
-                LogManager.Instance.LogDebug($"📤 Server output added to Stage {_currentStageIndex}: {output}");
                 OnPropertyChanged(nameof(SelectedStageData));
+                OnPropertyChanged(nameof(TestStages));
             });
         }
 
-        #endregion
-
-        #region Event Handlers - Middleware
-
-        private async void OnTransactionCompletedHandler(NetworkTransaction transaction)
-        {
-            LogManager.Instance.LogInfomation($"🌐 [MIDDLEWARE] Transaction received");
-            LogManager.Instance.LogInfomation($"   Protocol: {transaction?.Protocol}");
-            LogManager.Instance.LogInfomation($"   Request: {transaction?.Request?.Method} {transaction?.Request?.Url}");
-            LogManager.Instance.LogInfomation($"   Response: {transaction?.Response?.StatusCode}");
-
-            try
-            {
-                lock (_transactionLock)
-                {
-                    _pendingTransactions.Enqueue(transaction);
-                    LogManager.Instance.LogDebug($"📦 Buffered transaction (Queue size: {_pendingTransactions.Count})");
-                }
-
-            }
-            catch (Exception ex)
-            {
-                LogManager.Instance.LogError($"❌ OnTransactionCompletedHandler error: {ex.Message}");
-            }
-        }
-
-
-        private void FlushPendingTransactions()
-        {
-            lock (_transactionLock)
-            {
-                int count = _pendingTransactions.Count;
-
-                if (count == 0)
-                {
-                    LogManager.Instance.LogDebug($"📦 No pending transactions to flush");
-                    return;
-                }
-
-                LogManager.Instance.LogInfomation($"📦 Flushing {count} buffered transaction(s) to Stage {_currentStageIndex}");
-
-                while (_pendingTransactions.Count > 0)
-                {
-                    var transaction = _pendingTransactions.Dequeue();
-
-                    try
-                    {
-                        OnMiddlewareTransaction(transaction);
-                    }
-                    catch (Exception ex)
-                    {
-                        LogManager.Instance.LogError($"❌ Error processing buffered transaction: {ex.Message}");
-                    }
-                }
-
-                LogManager.Instance.LogInfomation($"✅ Flushed {count} transaction(s) to Stage {_currentStageIndex}");
-            }
-        }
-
-
-        /// <summary>
-        /// ✅ FIXED v3.0: Create SEPARATE records for middleware data (không ghi đè console output)
-        /// </summary>
-        private void OnMiddlewareTransaction(NetworkTransaction transaction)
+        private void OnStagesChanged(Dictionary<int, TestStage> testStages)
         {
             Dispatcher.Invoke(() =>
             {
-                // ✅ V3.0: Tạo RECORD MỚI riêng cho middleware (KHÔNG tìm existing console output)
-                var outputServer = new OutputServer
-                {
-                    Stage = _currentStageIndex,
-                    Method = transaction.Request.Method,
-                    DataRequest = transaction.Request.Body,
-                    DataTypeMiddleware = transaction.Request.DataType,
-                    ByteSize = transaction.Request.ByteSize.ToString(),
-                    Output = null // Middleware record không có console output
-                };
-                CurrentTestStage.OutputServers.Add(outputServer);
+                LogManager.Instance.LogDebug($" Test stages changed (total: {testStages.Count})");
 
-                // ✅ V3.0: Tạo RECORD MỚI riêng cho middleware (KHÔNG tìm existing console output)
-                var outputClient = new OutputClient
+                // Refresh current stage data
+                int currentStageIndex = _testkitManagerService.GetCurrentStageIndex();
+                if (testStages.TryGetValue(currentStageIndex, out var currentStage))
                 {
-                    Stage = _currentStageIndex,
-                    Method = transaction.Request.Method,
-                    StatusCode = transaction.Response.StatusCode,
-                    DataResponse = transaction.Response.Body,
-                    DataTypeMiddleWare = transaction.Response.DataType,
-                    ByteSize = transaction.Response.ByteSize.ToString(),
-                    Output = null // Middleware record không có console output
-                };
-                CurrentTestStage.OutputClients.Add(outputClient);
+                    SelectedStageData = currentStage;
+                }
 
                 OnPropertyChanged(nameof(SelectedStageData));
-
-                LogManager.Instance.LogDebug($"🌐 Stage {_currentStageIndex} - Middleware transaction recorded: {transaction.Request.Method} - {transaction.Response.StatusCode}");
+                OnPropertyChanged(nameof(TestStages));
             });
         }
 
@@ -635,97 +301,143 @@ namespace WpfUI
 
             if (result == MessageBoxResult.Yes)
             {
-                // Remove all data for this stage
-                CurrentTestStage.InputClients.Where(i => i.Stage == SelectedStageKey).ToList()
-                    .ForEach(i => CurrentTestStage.InputClients.Remove(i));
-
-                CurrentTestStage.OutputClients.Where(o => o.Stage == SelectedStageKey).ToList()
-                    .ForEach(o => CurrentTestStage.OutputClients.Remove(o));
-
-                CurrentTestStage.OutputServers.Where(o => o.Stage == SelectedStageKey).ToList()
-                    .ForEach(o => CurrentTestStage.OutputServers.Remove(o));
-
-                StageKeys.Remove(SelectedStageKey);
-
-                if (StageKeys.Any())
+                // Get test stages from TestkitManagerService
+                var testStages = _testkitManagerService.GetCurrentTestStages();
+                if (testStages.ContainsKey(SelectedStageKey))
                 {
-                    SelectedStageKey = StageKeys.First();
+                    // Remove stage from dictionary
+                    testStages.Remove(SelectedStageKey);
+
+                    // Remove from UI collection
+                    StageKeys.Remove(SelectedStageKey);
+
+                    // Select another stage if available
+                    if (StageKeys.Any())
+                    {
+                        SelectedStageKey = StageKeys.First();
+                    }
+                    else
+                    {
+                        // No stages left, clear selected data
+                        SelectedStageData = new TestStage();
+                    }
+
+                    LogManager.Instance.LogInfomation($" Stage {SelectedStageKey} deleted");
+
+                    // Notify UI to refresh
+                    OnPropertyChanged(nameof(TestStages));
+                    OnPropertyChanged(nameof(SelectedStageData));
                 }
-
-                LogManager.Instance.LogInfomation($"🗑️ Stage {SelectedStageKey} deleted");
-            }
-        }
-
-        private void BtnDeleteInputClient_Click(object sender, RoutedEventArgs e)
-        {
-            if (dgInputClients.SelectedItem is InputClient selectedItem)
-            {
-                // Prevent deleting stage 1 initial input
-                if (selectedItem.Stage == 1 && selectedItem.Action == ActionKeywords.START)
+                else
                 {
-                    var result = MessageBox.Show(
-                        "This is the initial connection input. Delete anyway?",
-                        "Warning",
-                        MessageBoxButton.YesNo,
-                        MessageBoxImage.Warning);
-
-                    if (result == MessageBoxResult.No)
-                        return;
+                    LogManager.Instance.LogWarning($" Stage {SelectedStageKey} not found in TestkitManagerService");
+                    MessageBox.Show(
+                        $"Stage {SelectedStageKey} not found.",
+                        "Error",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Error);
                 }
-
-                CurrentTestStage.InputClients.Remove(selectedItem);
-                LogManager.Instance.LogDebug("🗑️ Input client row deleted");
             }
         }
 
-        private void BtnDeleteOutputClient_Click(object sender, RoutedEventArgs e)
+        private void BtnClearInputClient_Click(object sender, RoutedEventArgs e)
         {
-            if (dgOutputClients.SelectedItem is OutputClient selectedItem)
+            var result = MessageBox.Show(
+                "Clear all User input data for this stage?",
+                "Confirm Clear",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+
+            if (result == MessageBoxResult.Yes)
             {
-                CurrentTestStage.OutputClients.Remove(selectedItem);
-                LogManager.Instance.LogDebug("🗑️ Output client row deleted");
+                var testStages = _testkitManagerService.GetCurrentTestStages();
+                if (testStages.TryGetValue(SelectedStageKey, out var currentStage))
+                {
+                    currentStage.User = null;
+                    OnPropertyChanged(nameof(SelectedStageData));
+                    LogManager.Instance.LogDebug($" User input cleared for Stage {SelectedStageKey}");
+                }
             }
         }
 
-        private void BtnDeleteOutputServer_Click(object sender, RoutedEventArgs e)
+        private void BtnClearOutputClient_Click(object sender, RoutedEventArgs e)
         {
-            if (dgOutputServers.SelectedItem is OutputServer selectedItem)
+            var result = MessageBox.Show(
+                "Clear all Client output data for this stage?",
+                "Confirm Clear",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+
+            if (result == MessageBoxResult.Yes)
             {
-                CurrentTestStage.OutputServers.Remove(selectedItem);
-                LogManager.Instance.LogDebug("🗑️ Output server row deleted");
+                var testStages = _testkitManagerService.GetCurrentTestStages();
+                if (testStages.TryGetValue(SelectedStageKey, out var currentStage))
+                {
+                    currentStage.Client = null;
+                    OnPropertyChanged(nameof(SelectedStageData));
+                    LogManager.Instance.LogDebug($" Client output cleared for Stage {SelectedStageKey}");
+                }
             }
         }
 
-        #endregion
-
-        #region Process Management
-
-        /// <summary>
-        /// Set process info (called from MainWindow after starting processes)
-        /// </summary>
-        /// <param name="clientChild">Client process handle</param>
-        /// <param name="clientMutex">Client mutex</param>
-        /// <param name="clientCts">Client cancellation token source</param>
-        /// <param name="serverChild">Server process handle</param>
-        /// <param name="serverMutex">Server mutex</param>
-        /// <param name="serverCts">Server cancellation token source</param>
-        /// <param name="processManager">Process manager instance</param>
-        public void SetProcessInfo(
-            ChildProcess clientChild, IntPtr clientMutex, CancellationTokenSource clientCts,
-            ChildProcess serverChild, IntPtr serverMutex, CancellationTokenSource serverCts,
-            ProcessManager processManager)
+        private void BtnClearOutputServer_Click(object sender, RoutedEventArgs e)
         {
-            _clientChild = clientChild;
-            _clientMutex = clientMutex;
-            _clientCts = clientCts;
+            var result = MessageBox.Show(
+                "Clear all Server output data for this stage?",
+                "Confirm Clear",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
 
-            _serverChild = serverChild;
-            _serverMutex = serverMutex;
-            _serverCts = serverCts;
+            if (result == MessageBoxResult.Yes)
+            {
+                var testStages = _testkitManagerService.GetCurrentTestStages();
+                if (testStages.TryGetValue(SelectedStageKey, out var currentStage))
+                {
+                    currentStage.Server = null;
+                    OnPropertyChanged(nameof(SelectedStageData));
+                    LogManager.Instance.LogDebug($" Server output cleared for Stage {SelectedStageKey}");
+                }
+            }
+        }
 
-            _processManager = processManager;
+        private void BtnClearOutputDB_Click(object sender, RoutedEventArgs e)
+        {
+            var result = MessageBox.Show(
+                "Clear all Database data for this stage?",
+                "Confirm Clear",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
 
-            LogManager.Instance.LogDebug($"✅ Process info set - Client PID: {clientChild.processId}, Server PID: {serverChild.processId}");
+            if (result == MessageBoxResult.Yes)
+            {
+                var testStages = _testkitManagerService.GetCurrentTestStages();
+                if (testStages.TryGetValue(SelectedStageKey, out var currentStage))
+                {
+                    currentStage.Database = new Database();
+                    OnPropertyChanged(nameof(SelectedStageData));
+                    LogManager.Instance.LogDebug($" Database data cleared for Stage {SelectedStageKey}");
+                }
+            }
+        }
+
+        private void BtnClearNetwork_Click(object sender, RoutedEventArgs e)
+        {
+            var result = MessageBox.Show(
+                "Clear all Network data for this stage?",
+                "Confirm Clear",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+
+            if (result == MessageBoxResult.Yes)
+            {
+                var testStages = _testkitManagerService.GetCurrentTestStages();
+                if (testStages.TryGetValue(SelectedStageKey, out var currentStage))
+                {
+                    currentStage.Network = new Network();
+                    OnPropertyChanged(nameof(SelectedStageData));
+                    LogManager.Instance.LogDebug($" Network data cleared for Stage {SelectedStageKey}");
+                }
+            }
         }
 
         #endregion
@@ -743,10 +455,24 @@ namespace WpfUI
 
         /// <summary>
         /// Handle window closing event
-        /// Stop all processes and cleanup resources
+        /// Stop all processes and cleanup resources close tag
         /// </summary>
         protected override async void OnClosing(CancelEventArgs e)
         {
+            if (_isClosing)
+            {
+                try
+                {
+                    StageKeys?.Clear();
+                    SelectedStageData = null;
+                    this.DataContext = null;
+                    BindingOperations.ClearAllBindings(this);
+                }
+                catch { }
+                base.OnClosing(e);
+                return;
+            }
+            e.Cancel = true;
             var result = MessageBox.Show(
                 "Stop recording and close?\n\nAll processes will be terminated.",
                 "Confirm Close",
@@ -761,40 +487,16 @@ namespace WpfUI
 
             try
             {
-                LogManager.Instance.LogInfomation("🛑 Closing RecorderWindow - stopping all processes...");
-
-                // Unsubscribe from events
-                UnsubscribeFromDataSources();
-
-                // Stop middleware
-                if (MiddlewareStart.Instance.IsRunning)
-                {
-                    LogManager.Instance.LogDebug("Stopping middleware...");
-                    await MiddlewareStart.Instance.StopAsync();
-                }
-
-                //  Stop client process (with CancellationTokenSource)
-                if (_processManager != null && _clientChild.hProcess != IntPtr.Zero && _clientCts != null)
-                {
-                    LogManager.Instance.LogDebug("Stopping client process...");
-                    await _processManager.StopSingleAsync(_clientChild, _clientMutex, _clientCts, "Client");
-                }
-
-                //  Stop server process (with CancellationTokenSource)
-                if (_processManager != null && _serverChild.hProcess != IntPtr.Zero && _serverCts != null)
-                {
-                    LogManager.Instance.LogDebug("Stopping server process...");
-                    await _processManager.StopSingleAsync(_serverChild, _serverMutex, _serverCts, "Server");
-                }
-
-                // Dispose ProcessManager
-                _processManager?.Dispose();
-
-                LogManager.Instance.LogInfomation("⏹️ Recording stopped - all processes terminated");
+                LogManager.Instance.LogInfomation("Closing RecorderWindow - stopping all processes...");
+                this.IsEnabled = false;
+                _isClosing = true;
+                await CleanupAsync();
+                this.Close();
+                LogManager.Instance.LogInfomation("Recording stopped - all processes terminated");
             }
             catch (Exception ex)
             {
-                LogManager.Instance.LogError($"❌ Error closing recorder: {ex.Message}");
+                LogManager.Instance.LogError($" Error closing recorder: {ex.Message}");
                 LogManager.Instance.LogError($"Stack trace: {ex.StackTrace}");
 
                 MessageBox.Show(
@@ -802,34 +504,129 @@ namespace WpfUI
                     "Error",
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
+                _isClosing = true;
+                base.OnClosing(e);
             }
 
-            base.OnClosing(e);
         }
 
         private async Task CloseClientAsync()
         {
-            if (_processManager != null && _clientChild.hProcess != IntPtr.Zero && _clientCts != null)
+
+            try
             {
-                LogManager.Instance.LogDebug("Stopping client process...");
-                await _processManager.StopSingleAsync(_clientChild, _clientMutex, _clientCts, "Client");
+                if (_clientChild.hProcess == IntPtr.Zero)
+                {
+                    LogManager.Instance.LogWarning("Client process already closed");
+                    return;
+                }
+
+                LogManager.Instance.LogInfomation("Stopping Client process...");
+
+                if (_clientCts != null)
+                {
+                    _clientCts.Cancel();
+                }
+
+                await _processManager.CloseClientAsync();
+
+                _clientChild = default;
+                _clientMutex = IntPtr.Zero;
+                _clientCts?.Dispose();
+                _clientCts = null;
+
+                _isClientRunning = false;
+                if (!_isClosing)
+                {
+                    UpdateProcessButtonStates();
+                }
+                LogManager.Instance.LogInfomation("Client process stopped successfully");
+
+                if (!_isClientRunning && _isMiddlewareRunning && !_isClosing)
+                {
+                    await StopMiddlewareAsync();
+                }
             }
+            catch (Exception ex)
+            {
+                LogManager.Instance.LogError($"Error stopping client: {ex.Message}");
+                LogManager.Instance.LogError($"   Stack trace: {ex.StackTrace}");
+                throw;
+            }
+
         }
         private async Task StopMiddlewareAsync()
         {
-            if (MiddlewareStart.Instance.IsRunning)
+            bool shouldStop = false;
+            lock (_middlewareLock)
             {
-                LogManager.Instance.LogDebug("Stopping middleware...");
-                await MiddlewareStart.Instance.StopAsync();
+                if (_isMiddlewareRunning)
+                {
+                    _isMiddlewareRunning = false;
+                    shouldStop = true;
+                }
             }
+            if (!shouldStop)
+            {
+                LogManager.Instance.LogDebug("Middleware already stopped by another thread");
+                return;
+            }
+            try
+            {
+                if (MiddlewareStart.Instance.IsRunning)
+                {
+                    LogManager.Instance.LogDebug("Stopping middleware...");
+                    await Task.Delay(200);
+                    await MiddlewareStart.Instance.StopAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+            }
+
         }
 
         private async Task CloseServerAsync()
         {
-            if (_processManager != null && _serverChild.hProcess != IntPtr.Zero && _serverCts != null)
+            try
             {
-                LogManager.Instance.LogDebug("Stopping server process...");
-                await _processManager.StopSingleAsync(_serverChild, _serverMutex, _serverCts, "Server");
+                if (_serverChild.hProcess == IntPtr.Zero)
+                {
+                    LogManager.Instance.LogWarning("⚠️ Server process already closed");
+                    return;
+                }
+                LogManager.Instance.LogInfomation("Stopping Server process...");
+
+                if (_serverCts != null)
+                {
+                    _serverCts?.Cancel();
+                }
+
+                await _processManager.CloseServerAsync();
+
+                _serverChild = default;
+                _serverMutex = IntPtr.Zero;
+                _serverCts?.Dispose();
+                _serverCts = null;
+
+                _isServerRunning = false;
+                if (!_isClosing)
+                {
+                    UpdateProcessButtonStates();
+                }
+
+                LogManager.Instance.LogInfomation("Server process stopped successfully");
+
+                if (!_isServerRunning && _isMiddlewareRunning && !_isClosing)
+                {
+                    await StopMiddlewareAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                LogManager.Instance.LogError($"Error stopping server: {ex.Message}");
+                LogManager.Instance.LogError($"Stack trace: {ex.StackTrace}");
+                throw;
             }
         }
 
@@ -850,7 +647,9 @@ namespace WpfUI
         {
             try
             {
-                if (TestStages == null || !TestStages.Any())
+                var testStages = _testkitManagerService.GetCurrentTestStages();
+
+                if (testStages == null || !testStages.Any())
                 {
                     MessageBox.Show(
                         "Không có dữ liệu để xuất.",
@@ -860,118 +659,114 @@ namespace WpfUI
                     return;
                 }
 
-                var saveFileDialog = new Microsoft.Win32.SaveFileDialog
+                var allUsers = testStages
+                    .OrderBy(x => x.Key)
+                    .Where(stage => stage.Value.User != null && stage.Value.User.Stage > 0)
+                    .Select(stage => stage.Value.User)
+                    .Cast<object>()
+                    .ToList();
+
+                var allClients = testStages
+                    .OrderBy(x => x.Key)
+                    .Where(stage => stage.Value.Client != null && stage.Value.Client.Stage > 0)
+                    .Select(stage => stage.Value.Client)
+                    .Cast<object>()
+                    .ToList();
+
+                var allServers = testStages
+                    .OrderBy(x => x.Key)
+                    .Where(stage => stage.Value.Server != null && stage.Value.Server.Stage > 0)
+                    .Select(stage => stage.Value.Server)
+                    .Cast<object>()
+                    .ToList();
+
+                var allDatabases = testStages
+                    .OrderBy(x => x.Key)
+                    .Where(stage => stage.Value.Database != null && stage.Value.Database.Stage > 0)
+                    .Select(stage => stage.Value.Database)
+                    .Cast<object>()
+                    .ToList();
+
+                var allNetworks = testStages
+                    .OrderBy(x => x.Key)
+                    .Where(stage => stage.Value.Network != null && stage.Value.Network.Stage > 0)
+                    .Select(stage => stage.Value.Network)
+                    .Cast<object>()
+                    .ToList();
+
+                var sheetsList = new List<(string SheetName, ICollection<object> Data)>
                 {
-                    Filter = "Excel Files|*.xlsx",
-                    Title = "Save Excel File",
-                    FileName = $"{_testCaseName}_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx"
+                    ("User", allUsers),
+                    ("Client", allClients),
+                    ("Server", allServers),
+                    ("Database", allDatabases),
+                    ("Network", allNetworks)
                 };
-
-                if (saveFileDialog.ShowDialog() == true)
+                if (!sheetsList.Any())
                 {
-                    var exporter = new ExcelExporter();
-
-                    // Gộp tất cả InputClients từ tất cả các stage
-                    var allInputClients = TestStages
-                        .OrderBy(x => x.Key)
-                        .SelectMany(stage => stage.Value.InputClients ?? new ObservableCollection<InputClient>())
-                        .Cast<object>()
-                        .ToList();
-
-                    // Gộp tất cả OutputClients từ tất cả các stage
-                    var allOutputClients = TestStages
-                        .OrderBy(x => x.Key)
-                        .SelectMany(stage => stage.Value.OutputClients ?? new ObservableCollection<OutputClient>())
-                        .Cast<object>()
-                        .ToList();
-
-                    // Gộp tất cả OutputServers từ tất cả các stage
-                    var allOutputServers = TestStages
-                        .OrderBy(x => x.Key)
-                        .SelectMany(stage => stage.Value.OutputServers ?? new ObservableCollection<OutputServer>())
-                        .Cast<object>()
-                        .ToList();
-
-                    // Gộp tất cả OutputDBs từ tất cả các stage
-                    var allOutputDBs = TestStages
-                        .OrderBy(x => x.Key)
-                        .SelectMany(stage => stage.Value.OutputDBs ?? new ObservableCollection<OutputDB>())
-                        .Cast<object>()
-                        .ToList();
-
-                    // Tạo danh sách 4 sheets
-                    var sheetsList = new List<(string SheetName, ICollection<object> Data)>();
-
-                    if (allInputClients.Any())
-                        sheetsList.Add(("InputClient", allInputClients));
-
-                    if (allOutputClients.Any())
-                        sheetsList.Add(("OutputClient", allOutputClients));
-
-                    if (allOutputServers.Any())
-                        sheetsList.Add(("OutputServer", allOutputServers));
-
-                    if (allOutputDBs.Any())
-                        sheetsList.Add(("OutputDB", allOutputDBs));
-
-                    if (!sheetsList.Any())
-                    {
-                        MessageBox.Show(
-                            "Không có dữ liệu để xuất.",
-                            "Thông báo",
-                            MessageBoxButton.OK,
-                            MessageBoxImage.Warning);
-                        return;
-                    }
-
-                    // Gọi ExportToExcelParams với 4 sheets
-                    exporter.ExportToExcelParams(
-                        saveFileDialog.FileName,
-                        sheetsList.ToArray()
-                    );
-
-                    LogManager.Instance.LogInfomation($"📊 Exported test data to: {saveFileDialog.FileName}");
+                    MessageBox.Show(
+                        "Không có dữ liệu để xuất.",
+                        "Thông báo",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    return;
                 }
+
+                var detailsPath = Path.Combine(_testcasePath, "detail.xlsx");
+
+
+                ExcelExecution exporter = new ExcelExecution();
+                exporter.ExportToExcelParams(detailsPath, sheetsList.ToArray());
+
+                LogManager.Instance.LogInfomation($" Exported test data to: {detailsPath}");
+                MessageBox.Show($"Data exported successfully to:\n{detailsPath}", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
-                LogManager.Instance.LogError($"❌ Error exporting data: {ex.Message}");
-                MessageBox.Show(
-                    $"Lỗi khi xuất dữ liệu:\n\n{ex.Message}",
-                    "Lỗi",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                LogManager.Instance.LogError($" Error exporting data: {ex.Message}");
+                MessageBox.Show($"Lỗi khi xuất dữ liệu:\n\n{ex.Message}", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
             }
+        }
+
+        private void UpdateProcessButtonStates()
+        {
+            Dispatcher.Invoke(() =>
+            {
+                // Client buttons
+                BtnStartClient.Visibility = _isClientRunning ? Visibility.Collapsed : Visibility.Visible;
+                BtnCloseClient.Visibility = _isClientRunning ? Visibility.Visible : Visibility.Collapsed;
+
+                // Server buttons
+                BtnStartServer.Visibility = _isServerRunning ? Visibility.Collapsed : Visibility.Visible;
+                BtnCloseServer.Visibility = _isServerRunning ? Visibility.Visible : Visibility.Collapsed;
+
+                LogManager.Instance.LogDebug($" Buttons - Client running: {_isClientRunning}, Server running: {_isServerRunning}");
+            });
+
         }
 
         private async void BtnCloseClient_Click(object sender, RoutedEventArgs e)
         {
             var result = MessageBox.Show(
-        "Are you sure you want to stop the Client process?",
-        "Confirm Close Client",
-        MessageBoxButton.YesNo,
-        MessageBoxImage.Question);
+                "Are you sure you want to stop the Client process?",
+                "Confirm Close Client",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
 
             if (result == MessageBoxResult.No)
                 return;
 
             try
             {
-                LogManager.Instance.LogInfomation("🔴 Stopping Client process...");
+                BtnCloseClient.IsEnabled = false;
+
                 await CloseClientAsync();
-                await StopMiddlewareAsync();
+                LogManager.Instance.LogInfomation(" Client process stopped successfully");
 
-                LogManager.Instance.LogInfomation("✅ Client process stopped successfully");
-
-                MessageBox.Show(
-                    "Client process stopped successfully.",
-                    "Success",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
-                LogManager.Instance.LogError($"❌ Error stopping client: {ex.Message}");
+                LogManager.Instance.LogError($" Error stopping client: {ex.Message}");
                 MessageBox.Show(
                     $"Error stopping client process:\n\n{ex.Message}",
                     "Error",
@@ -993,8 +788,8 @@ namespace WpfUI
 
             try
             {
+                BtnCloseServer.IsEnabled = false;
                 await CloseServerAsync();
-                await StopMiddlewareAsync();
                 MessageBox.Show(
                     "Server process stopped successfully.",
                     "Success",
@@ -1003,7 +798,7 @@ namespace WpfUI
             }
             catch (Exception ex)
             {
-                LogManager.Instance.LogError($"❌ Error stopping server: {ex.Message}");
+                LogManager.Instance.LogError($" Error stopping server: {ex.Message}");
                 MessageBox.Show(
                     $"Error stopping server process:\n\n{ex.Message}",
                     "Error",
@@ -1012,9 +807,224 @@ namespace WpfUI
             }
         }
 
-        private void BtnDeleteOutputDB_Click(object sender, RoutedEventArgs e)
+        private async void BtnStartClient_Click(object sender, RoutedEventArgs e)
         {
+            if (_isClientRunning)
+            {
+                MessageBox.Show("Server is already running.", "Info", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
 
+            if (!File.Exists(_clientPath))
+            {
+                throw new FileNotFoundException($"Client executable not found: {_clientPath}");
+            }
+
+            if (_clientMutex != IntPtr.Zero && _clientCts != null)
+            {
+                try
+                {
+                    await CloseClientAsync();
+                }
+                catch (Exception ex)
+                {
+                    LogManager.Instance.LogError($"Error cleaning up old client: {ex.Message}");
+                }
+            }
+
+            try
+            {
+                if (_currentStageIndex >= 1)
+                {
+                    _currentStageIndex++;
+                }
+                else
+                {
+                    _currentStageIndex = 1;
+                }
+                if (!_isMiddlewareRunning && _isServerRunning)
+                {
+                    LogManager.Instance.LogInfomation("Starting middleware...");
+                    await MiddlewareStart.Instance.StartAsync(_proxyPort, _serverPort, _isHttp);
+                    _isMiddlewareRunning = true;
+                }
+                BtnStartClient.IsEnabled = false;
+                _testkitManagerService.CreateInitialStage(ActionKeywords.START_CLIENT);
+
+                var clientResult = await _processManager.StartSingleWithPollingAsync(
+                    _clientPath,
+                    "Client",
+                    isClient: true,
+                    showConsoleMessages: false
+                );
+
+                //  ASSIGN to fields
+                _clientChild = clientResult.child;
+                _clientMutex = clientResult.mutex;
+                _clientCts = clientResult.cts;
+
+                _isClientRunning = true;
+                UpdateProcessButtonStates();
+            }
+            catch (Exception ex)
+            {
+            }
+            finally
+            {
+                BtnStartClient.IsEnabled = true;
+            }
+        }
+
+        private async void BtnStartServer_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isServerRunning)
+            {
+                MessageBox.Show("Server is already running.", "Info", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            if (!File.Exists(_serverPath))
+            {
+                throw new FileNotFoundException($"Server executable not found: {_serverPath}");
+            }
+            if (_serverMutex != IntPtr.Zero || _serverCts != null)
+            {
+                LogManager.Instance.LogWarning("Server process handle still exists, cleaning up...");
+
+                try
+                {
+                    await CloseServerAsync();
+                }
+                catch (Exception ex)
+                {
+                    LogManager.Instance.LogError($"Error cleaning up old server: {ex.Message}");
+                }
+            }
+
+            try
+            {
+                if (_currentStageIndex >= 1)
+                {
+                    _currentStageIndex++;
+                }
+                else
+                {
+                    _currentStageIndex = 1;
+                }
+
+                if (!_isMiddlewareRunning && _isClientRunning)
+                {
+                    LogManager.Instance.LogInfomation("Starting middleware...");
+                    await MiddlewareStart.Instance.StartAsync(_proxyPort, _serverPort, _isHttp);
+                    _isMiddlewareRunning = true;
+                }
+                _testkitManagerService.CreateInitialStage(ActionKeywords.START_SERVER);
+
+                BtnStartServer.IsEnabled = false;
+                var serverResult = await _processManager.StartSingleWithPollingAsync(
+                    _serverPath,
+                    "Server",
+                    isClient: false,
+                    showConsoleMessages: false
+                );
+
+                _serverChild = serverResult.child;
+                _serverMutex = serverResult.mutex;
+                _serverCts = serverResult.cts;
+
+                _isServerRunning = true;
+                UpdateProcessButtonStates();
+                await Task.Delay(1000);
+            }
+            catch (Exception ex)
+            {
+                LogManager.Instance.LogError($"Error starting server: {ex.Message}");
+            }
+            finally
+            {
+                BtnStartServer.IsEnabled = true;
+            }
+        }
+
+        public async Task CleanupAsync()
+        {
+            try
+            {
+                LogManager.Instance?.LogInfomation("🛑 Cleaning up RecorderWindow resources...");
+
+                // Unsubscribe from events FIRST
+                UnsubscribeFromDataSources();
+
+                var tasks = new List<Task>();
+                // Stop client
+                if (_isClientRunning)
+                {
+                    var clientTask = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await CloseClientAsync();
+                        }
+                        catch (Exception ex)
+                        {
+                            LogManager.Instance?.LogWarning($"Client stop failed: {ex.Message}");
+                        }
+                    });
+                    tasks.Add(clientTask);
+                }
+
+                // Stop server
+                if (_isServerRunning)
+                {
+                    var serverTask = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await CloseServerAsync();
+                        }
+                        catch (Exception ex)
+                        {
+                            LogManager.Instance?.LogWarning($"Server stop failed: {ex.Message}");
+                        }
+                    });
+                    tasks.Add(serverTask);
+                }
+                if (tasks.Any())
+                {
+                    LogManager.Instance?.LogInfomation($"Waiting for {tasks.Count} process(es) to close...");
+                    await Task.WhenAll(tasks);
+                }
+                await Task.Delay(1000);
+                // Stop middleware
+                if (_isMiddlewareRunning)
+                {
+                    try
+                    {
+                        await StopMiddlewareAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        LogManager.Instance?.LogWarning($"Middleware stop failed: {ex.Message}");
+                    }
+                }
+
+                // Dispose ProcessManager
+                try
+                {
+                    _processManager?.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    LogManager.Instance?.LogWarning($"ProcessManager dispose failed: {ex.Message}");
+                }
+
+                LogManager.Instance?.LogInfomation(" RecorderWindow cleanup completed");
+            }
+            catch (Exception ex)
+            {
+                LogManager.Instance?.LogError($" Error during cleanup: {ex.Message}");
+                LogManager.Instance?.LogError($"Stack trace: {ex.StackTrace}");
+            }
         }
     }
 }

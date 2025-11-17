@@ -9,13 +9,6 @@ namespace Common.Interfaces.Services
 {
     public interface IProcessManager : IDisposable
     {
-        #region event
-        event Action<string> OnClientOutput;
-        event Action<string> OnServerOutput;
-        event Action<string, string> OnUserInput;
-        #endregion
-
-
         #region ProcessManager
         Task<(ChildProcess child, IntPtr mutex, CancellationTokenSource cts)> StartSingleWithPollingAsync(
             string exePath,
@@ -36,9 +29,13 @@ namespace Common.Interfaces.Services
             ChildProcess child,
             IntPtr mutex,
             bool showConsoleMessages = false);
+        Task CaptureSnapshotOnlyAsync(
+    ChildProcess child,
+    IntPtr mutex,
+    string processName);
 
-        void CloseClient();
-        void CloseServer();
+        Task CloseClientAsync();
+        Task CloseServerAsync();
         #endregion
     }
 }

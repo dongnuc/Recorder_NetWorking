@@ -4,6 +4,7 @@ using Common.Helper.Kernel32API.Implement;
 using Common.Helper.Kernel32API.Interface;
 using Common.Interfaces.Services;
 using Common.Logging;
+using Common.Resources;
 using System.Collections.Concurrent;
 
 namespace ProcessManagement.Services
@@ -19,28 +20,19 @@ namespace ProcessManagement.Services
         private readonly IMutexManager _mutexManager;
         private readonly IConsoleManager _consoleManager;
         private readonly IProcessWaiter _processWaiter;
+        private readonly ITestkitManagerService _testkitManagerService;
 
-        // Track active input monitoring tasks
         private readonly ConcurrentDictionary<string, CancellationTokenSource> _monitoringTasks = new();
 
-        // ✅ Store process handles for capture
         private readonly ConcurrentDictionary<string, (ChildProcess child, IntPtr mutex)> _processHandles = new();
 
-        // ✅ Store previous console snapshots (for difference detection)
         private readonly ConcurrentDictionary<string, string> _previousSnapshots = new();
-
-        #endregion
-
-        #region Events
-        public event Action<string> OnClientOutput;
-        public event Action<string> OnServerOutput;
-        public event Action<string, string> OnUserInput;
 
         #endregion
 
         #region Constructor
 
-        public ProcessManager()
+        public ProcessManager(ITestkitManagerService testkitManagerService)
         {
             _processStarter = new ProcessStarter();
             _consolePoller = new ConsolePoller();
@@ -49,14 +41,12 @@ namespace ProcessManagement.Services
             _consoleManager = new ConsoleManager();
             _processWaiter = new ProcessWaiter();
             LogManager.Instance.LogDebug("ProcessManager initialized");
+            _testkitManagerService = testkitManagerService;
         }
 
         #endregion
 
-        #region Start Single Process (New Logic)
-        /// <summary>
-        /// ✅ V4.0: Start process và capture initial output
-        /// </summary>
+        #region Start Single Process 
         /// <param name="exePath">Path to executable</param>
         /// <param name="name">Process name (e.g., "Client" or "Server")</param>
         /// <param name="isClient">True if client, false if server</param>
@@ -82,7 +72,7 @@ namespace ProcessManagement.Services
             // Store process handles
             _processHandles[name] = (child, mutex);
 
-            await Task.Delay(2000);
+            await Task.Delay(3000);
 
             //  Capture INITIAL output (lần đầu tiên)
             await CaptureAndRaiseInitialOutputAsync(child, mutex, name, isClient);
@@ -110,7 +100,7 @@ namespace ProcessManagement.Services
         {
             try
             {
-                LogManager.Instance.LogInfomation($"📸 Capturing initial output for {processName}");
+                LogManager.Instance.LogInfomation($"Capturing initial output for {processName}");
 
                 string initialOutput = await _consolePoller.CaptureCurrentConsoleAsync(
                     child,
@@ -122,27 +112,27 @@ namespace ProcessManagement.Services
                 {
                     _previousSnapshots[processName] = initialOutput;
 
-                    LogManager.Instance.LogInfomation($"✅ Initial output captured ({initialOutput.Length} chars)");
-                    LogManager.Instance.LogDebug($"📝 Initial content:\n{initialOutput}");
+                    LogManager.Instance.LogInfomation($" Initial output captured ({initialOutput.Length} chars)");
+                    LogManager.Instance.LogDebug($" Initial content:\n{initialOutput}");
 
                     if (isClient)
                     {
-                        OnClientOutput?.Invoke(initialOutput);
+                        _testkitManagerService.ReceiveClientOutput(initialOutput);
                     }
                     else
                     {
-                        OnServerOutput?.Invoke(initialOutput);
+                        _testkitManagerService.ReceiveServerOutput(initialOutput);
                     }
                 }
                 else
                 {
-                    LogManager.Instance.LogWarning($"⚠️ No initial output for {processName}");
+                    LogManager.Instance.LogWarning($" No initial output for {processName}");
                     _previousSnapshots[processName] = string.Empty;
                 }
             }
             catch (Exception ex)
             {
-                LogManager.Instance.LogError($"❌ Error capturing initial output for {processName}: {ex.Message}");
+                LogManager.Instance.LogError($"Error capturing initial output for {processName}: {ex.Message}");
                 _previousSnapshots[processName] = string.Empty;
             }
         }
@@ -157,7 +147,7 @@ namespace ProcessManagement.Services
             string name,
             bool showConsoleMessages = false)
         {
-            LogManager.Instance.LogInfomation($"⏹️ Stopping {name} process...");
+            LogManager.Instance.LogInfomation($" Stopping {name} process...");
 
             try
             {
@@ -190,7 +180,7 @@ namespace ProcessManagement.Services
         #region Input Monitoring (Enter Key Detection) - New Logic
 
         /// <summary>
-        /// ✅ V4.0: Monitor Enter key và trigger capture sequence
+        ///  V4.0: Monitor Enter key và trigger capture sequence
         /// </summary>
         private void StartInputMonitoring(
             ChildProcess child,
@@ -209,6 +199,7 @@ namespace ProcessManagement.Services
                 LogManager.Instance.LogDebug($"🔍 Started Enter key monitoring for {processName}");
 
                 bool lastEnterState = false;
+                bool lastF10State = false;
                 DateTime lastTriggerTime = DateTime.MinValue;
                 const int DEBOUNCE_MS = 300;
 
@@ -221,9 +212,13 @@ namespace ProcessManagement.Services
                             LogManager.Instance.LogDebug($"Process {processName} handle is null, stopping monitor");
                             break;
                         }
-
+                        //EnableProcessExitMonitoring(child, processName, mutex);
                         // Check Enter key state 0x0D => enter | 0x7B => F12
                         bool currentEnterState = _keyListener.IsKeyPressed(Constants.VK_F12);
+
+                        // Check F10 key for snapshot only to update current snapshot
+                        bool currentF10State = _keyListener.IsKeyPressed(Constants.VK_F10);
+
 
                         if (currentEnterState && !lastEnterState)
                         {
@@ -239,6 +234,19 @@ namespace ProcessManagement.Services
                             }
                         }
 
+                        //if (currentF10State && !lastF10State)
+                        //{
+                        //    var timeSinceLastTrigger = DateTime.Now - lastTriggerTime;
+                        //    if (timeSinceLastTrigger.TotalMilliseconds > DEBOUNCE_MS)
+                        //    {
+                        //        LogManager.Instance.LogInfomation($"📸 ===== F10 PRESSED in {processName} - Snapshot Only =====");
+                        //        await CaptureSnapshotOnlyAsync(child, mutex, processName);
+                        //        lastTriggerTime = DateTime.Now;
+                        //    }
+                        //}
+
+
+                        lastF10State = currentF10State;
                         lastEnterState = currentEnterState;
                         await Task.Delay(10, cts.Token);
                     }
@@ -253,14 +261,12 @@ namespace ProcessManagement.Services
                     }
                 }
 
-                LogManager.Instance.LogDebug($"🔍 Stopped Enter key monitoring for {processName}");
+                LogManager.Instance.LogDebug($" Stopped Enter key monitoring for {processName}");
             }, cts.Token);
         }
 
         /// <summary>
-        /// ✅ FIXED: Execute capture sequence với intelligent polling
-        /// </summary>
-        /// ✅ V4.1 FIXED: Execute capture sequence với adaptive polling và longer timeout
+        /// Execute capture sequence với adaptive polling và longer timeout
         /// </summary>
         private async Task ExecuteCaptureSequenceAsync(
             ChildProcess child,
@@ -297,15 +303,15 @@ namespace ProcessManagement.Services
                     var (input, outputClient) = DataInspector.SplitInputFromOutput(extractedCapture);
                     if (input != null && !string.IsNullOrWhiteSpace(input))
                     {
-                        OnUserInput?.Invoke(input, "UserInput");
+                        _testkitManagerService.ReceiveUserInput(input,ActionKeywords.INPUT);
                     }
                     else
                     {
-                        OnUserInput?.Invoke($"[Input at {DateTime.Now:HH:mm:ss}]", "UserInput");
-                        LogManager.Instance.LogWarning($" Could not extract input");
+                        _testkitManagerService.ReceiveUserInput("", "UserInput");
+                        LogManager.Instance.LogWarning($"Input is null");
                     }
                     LogManager.Instance.LogDebug($" STEP 5: Raising OnUserInput event");
-                    OnClientOutput?.Invoke(outputClient);
+                    _testkitManagerService.ReceiveClientOutput(outputClient);
                 }
                 else
                 {
@@ -313,10 +319,14 @@ namespace ProcessManagement.Services
                     if (!string.IsNullOrWhiteSpace(extractedCapture))
                     {
                         var outputSplit = extractedCapture.Split(new[] { "\r\n", "\n", "\r" }, StringSplitOptions.None);
-                        var outputLines = outputSplit.Skip(1).Where(l => !string.IsNullOrWhiteSpace(l));
-                        string outputResult = "";
-                        outputResult = string.Join(Environment.NewLine, outputLines);
-                        OnServerOutput?.Invoke(outputResult);
+
+                        // Chỉ skip dòng đầu nếu nó là chuỗi rỗng
+                        var outputLines = (outputSplit.Length > 0 && outputSplit[0] == "")
+                            ? outputSplit.Skip(1).Where(l => !string.IsNullOrWhiteSpace(l))
+                            : outputSplit.Where(l => !string.IsNullOrWhiteSpace(l));
+
+                        string outputResult = string.Join(Environment.NewLine, outputLines);
+                        _testkitManagerService.ReceiveServerOutput(outputResult);
                     }
                 }
 
@@ -394,6 +404,7 @@ namespace ProcessManagement.Services
             IntPtr mutex = _mutexManager.Create($"Global\\ConsoleAttachMutex_{name}");
             ChildProcess child = _processStarter.Start(exePath, name);
 
+
             if (showConsoleMessages)
             {
                 _consoleManager.Alloc();
@@ -429,14 +440,14 @@ namespace ProcessManagement.Services
                 LogManager.Instance.LogError($"Error closing process {child.name}: {ex.Message}");
             }
         }
-
+      
         #endregion
 
         #region Cleanup
 
-        /// <summary>
-        /// Cleanup all monitoring tasks
-        /// </summary>
+            /// <summary>
+            /// Cleanup all monitoring tasks
+            /// </summary>
         public void Dispose()
         {
             LogManager.Instance.LogDebug("ProcessManager disposing...");
@@ -454,14 +465,105 @@ namespace ProcessManagement.Services
             LogManager.Instance.LogDebug("ProcessManager disposed");
         }
 
-        public void CloseClient()
+        public async Task CloseClientAsync()
         {
-            throw new NotImplementedException();
+            LogManager.Instance.LogInfomation(" Closing Client process...");
+
+            try
+            {
+                if (_processHandles.TryGetValue("Client", out var handles))
+                {
+                    var (child, mutex) = handles;
+
+                    // Stop input monitoring
+                    StopInputMonitoring("Client");
+
+                    // Remove from dictionaries BEFORE closing
+                    _processHandles.TryRemove("Client", out _);
+                    _previousSnapshots.TryRemove("Client", out _);
+
+                    // Close process
+                    CloseSingle(child, mutex, false);
+
+                    LogManager.Instance.LogInfomation(" Client process closed");
+                }
+                else
+                {
+                    LogManager.Instance.LogWarning(" Client process not found");
+                }
+            }
+            catch (Exception ex)
+            {
+                LogManager.Instance.LogError($" Error closing Client: {ex.Message}");
+                throw;
+            }
+
+            await Task.CompletedTask;
         }
 
-        public void CloseServer()
+        public async Task CloseServerAsync()
         {
-            throw new NotImplementedException();
+            LogManager.Instance.LogInfomation(" Closing Server process...");
+
+            try
+            {
+                if (_processHandles.TryGetValue("Server", out var handles))
+                {
+                    var (child, mutex) = handles;
+
+                    // Server không có input monitoring, chỉ cần remove và close
+                    _processHandles.TryRemove("Server", out _);
+                    _previousSnapshots.TryRemove("Server", out _);
+
+                    // Close process
+                    CloseSingle(child, mutex, false);
+
+                    LogManager.Instance.LogInfomation(" Server process closed");
+                }
+                else
+                {
+                    LogManager.Instance.LogWarning(" Server process not found");
+                }
+            }
+            catch (Exception ex)
+            {
+                LogManager.Instance.LogError($" Error closing Server: {ex.Message}");
+                throw;
+            }
+
+            await Task.CompletedTask;
+        }
+
+        public async Task CaptureSnapshotOnlyAsync(ChildProcess child, nint mutex, string processName)
+        {
+            try
+            {
+                LogManager.Instance.LogDebug($"📸 Capturing snapshot for {processName}");
+
+                //  Capture console hiện tại
+                string currentSnapshot = await _consolePoller.CaptureCurrentConsoleAsync(
+                    child,
+                    mutex,
+                    expandBuffer: false
+                );
+
+                if (string.IsNullOrWhiteSpace(currentSnapshot))
+                {
+                    LogManager.Instance.LogWarning($" No output captured from {processName}");
+                    return;
+                }
+
+                LogManager.Instance.LogDebug($"Captured {currentSnapshot.Length} characters from {processName}");
+
+                //  Update previous snapshot 
+                _previousSnapshots[processName] = currentSnapshot;
+                LogManager.Instance.LogDebug($"Updated previous snapshot for {processName}");
+            }
+            catch (Exception ex)
+            {
+                LogManager.Instance.LogError($"Error capturing snapshot for {processName}: {ex.Message}");
+                LogManager.Instance.LogError($"Stack trace: {ex.StackTrace}");
+            }
         }
 
         #endregion

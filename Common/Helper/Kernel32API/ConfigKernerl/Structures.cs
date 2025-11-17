@@ -94,8 +94,9 @@ namespace Common.Helper.Kernel32API
         public const uint CTRL_C_EVENT = 0;
         public const uint CTRL_BREAK_EVENT = 1;
 
-        public const int VK_F12 = 0x7B;
+        public const int VK_F12 = 0x7B;         // F12 key
         public const int VK_ESCAPE = 0x1B;
+        public const int VK_F10 = 0x79;         // F10 key
 
         public const int INVALID_HANDLE_VALUE = -1;
     }

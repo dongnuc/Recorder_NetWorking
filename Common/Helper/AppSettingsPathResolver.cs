@@ -27,7 +27,7 @@ namespace Common.Helper
                 string appSettingsPath = Path.Combine(exeDirectory, "appsettings.json");
                 if (File.Exists(appSettingsPath))
                 {
-                    LogManager.Instance.LogDebug($"✅ Found appsettings.json: {appSettingsPath}");
+                    LogManager.Instance.LogDebug($" Found appsettings.json: {appSettingsPath}");
                     return appSettingsPath;
                 }
             }
@@ -36,7 +36,7 @@ namespace Common.Helper
                 LogManager.Instance.LogError($"Error resolving appsettings path: {ex.Message}");
                 return null;
             }
-            LogManager.Instance.LogWarning($"⚠️ appsettings.json not found for: {exePath}");
+            LogManager.Instance.LogWarning($"appsettings.json not found for: {exePath}");
             return null;
         }
     }
