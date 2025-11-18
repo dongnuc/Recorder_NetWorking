@@ -4,7 +4,6 @@
              xmlns:local="clr-namespace:WpfUI"
              xmlns:converters="clr-namespace:WpfUI.Converters"
              
-             StartupUri="ProjectExplorerWindow.xaml"
              >
 
     <Application.Resources>

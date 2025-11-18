@@ -9,6 +9,9 @@ using FileManagement.FileHelper;
 using FileManagement.FileHelper.FileHandler;
 using Common.Interfaces.IOFile;
 using Microsoft.Win32;
+using Microsoft.Extensions.DependencyInjection;
+using WpfUI.Services;
+using Common.Interfaces.Services;
 
 namespace WpfUI
 {
@@ -17,14 +20,20 @@ namespace WpfUI
         private readonly IOFolderHandler _folderHandler;
         private readonly IOFileHandler _fileHandler;
         private readonly IOFileManagement _fileManager;
-        
+        private readonly IServiceProvider _serviceProvider;
 
-        public ProjectExplorerWindow()
+        public ProjectExplorerWindow(
+            IServiceProvider serviceProvider,
+            IOFolderHandler folderHandler,
+            IOFileHandler fileHandler,
+            IOFileManagement fileManager)
         {
             InitializeComponent();
-            _folderHandler = new FolderHandler();
-            _fileHandler = new ExcelExecution();
-            _fileManager = new FileManage(_fileHandler);
+
+            _serviceProvider = serviceProvider;
+            _folderHandler = folderHandler;
+            _fileHandler = fileHandler;
+            _fileManager = fileManager;
 
             LoadRecentProject();
         }
@@ -47,7 +56,10 @@ namespace WpfUI
 
         private void BtnCreateNew_Click(object sender, RoutedEventArgs e)
         {
-            var setupWindow = new ProjectSetupWindow(_folderHandler, _fileHandler);
+            var setupWindow = new ProjectSetupWindow(
+                _fileHandler,
+                _serviceProvider,
+                _fileManager);
 
             this.Hide();
             setupWindow.ShowDialog();
@@ -66,7 +78,7 @@ namespace WpfUI
         {
             var dialog = new OpenFolderDialog
             {
-                Title = "Chọn thư mục Project TestKit"
+                Title = "Chọn thư mục Project TestKit (thư mục gốc)"
             };
 
             if (dialog.ShowDialog() == true)
@@ -117,7 +129,12 @@ namespace WpfUI
         {
             this.Hide();
 
-            var mainMenu = new MainMenu(viewModel);
+            var mainMenu = new MainMenu(
+                viewModel,
+                _fileHandler,
+                _serviceProvider,
+                _fileManager
+            );
 
             mainMenu.Closed += MainMenu_Closed;
             mainMenu.Show();

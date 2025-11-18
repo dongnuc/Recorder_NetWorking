@@ -1,4 +1,5 @@
 ﻿using Common.Interfaces.IOFile;
+using Common.Interfaces.Services; 
 using Common.Logging;
 using FileManagement.FileHelper.FileHandler;
 using FileManagement.FolderHelper;
@@ -16,19 +17,26 @@ namespace WpfUI
     {
         private readonly IOFolderHandler _folderHandler;
         private readonly IOFileHandler _fileHandler;
+        private readonly IServiceProvider _serviceProvider; 
+        private readonly IOFileManagement _fileManagement;
 
         public bool ProjectCreatedSuccessfully { get; private set; } = false;
         public MainMenuViewModel ViewModel { get; private set; }
 
-        public ProjectSetupWindow(IOFolderHandler folderHandler, IOFileHandler fileHandler)
+        public ProjectSetupWindow(
+            IOFileHandler fileHandler,
+            IServiceProvider serviceProvider,
+            IOFileManagement fileManagement)
         {
             InitializeComponent();
             ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
 
-            _folderHandler = folderHandler;
+            _folderHandler = new FolderHandler();
             _fileHandler = fileHandler;
+            _serviceProvider = serviceProvider;
+            _fileManagement = fileManagement;
 
-            LogManager.Instance.LogInfomation("ProjectSetupWindow opened");
+            LogManager.Instance.LogInfomation("🚀 ProjectSetupWindow opened");
             LoadSettings();
         }
 
@@ -53,7 +61,6 @@ namespace WpfUI
             var dialog = new OpenFileDialog { ValidateNames = false, CheckFileExists = false, CheckPathExists = true, FileName = "Select Folder", Title = "Select the base folder to create your project in" };
             if (dialog.ShowDialog() == true) { TxtProjectLocation.Text = Path.GetDirectoryName(dialog.FileName); }
         }
-
         private void BtnCreateProject_Click(object sender, RoutedEventArgs e)
         {
             if (string.IsNullOrWhiteSpace(TxtProjectName.Text) ||
@@ -75,7 +82,7 @@ namespace WpfUI
                 if (Directory.Exists(projectRoot))
                 {
                     var result = MessageBox.Show(
-                        "Testkit này đã tồn tại.\nBạn có muốn edit testkit này không?",
+                        "Testkit này đã tồn tại.\nBạn có muốn edit (chỉnh sửa) testkit này không?",
                         "Cảnh báo: Project đã tồn tại",
                         MessageBoxButton.YesNo,
                         MessageBoxImage.Warning);
