@@ -31,7 +31,7 @@
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
 
-                <TextBlock Grid.Row="0" Text="Open Recent" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,10"/>
+                <TextBlock Grid.Row="0" Text="Open Recent TestKit" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,10"/>
 
                 <Grid Grid.Row="1" Margin="0,0,0,10">
                     <Grid.ColumnDefinitions>
@@ -47,14 +47,31 @@
                              BorderThickness="0"
                              ScrollViewer.VerticalScrollBarVisibility="Auto"
                              SelectionChanged="LstRecentProjectsOpen"
-                             Cursor="Hand"/>
+                             Cursor="Hand">
+
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Margin="5">
+                                    <TextBlock Text="{Binding Name}" 
+                                               FontWeight="SemiBold" 
+                                               FontSize="14" 
+                                               Foreground="#2C3E50"/>
+
+                                    <TextBlock Text="{Binding Date}" 
+                                               FontSize="11" 
+                                               Foreground="Gray" 
+                                               Margin="0,2,0,0"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+
+                    </ListBox>
                 </Border>
             </Grid>
 
             <Grid Grid.Column="1">
                 <GroupBox Header="Getting Started" FontSize="16" FontWeight="SemiBold">
                     <StackPanel Orientation="Vertical">
-
                         <Button x:Name="BtnCreateNew" Click="BtnCreateNew_Click" 
                                 Height="80" Margin="10" 
                                 Background="#E9E9E9" BorderBrush="#DDD" 
@@ -63,10 +80,8 @@
                                 <TextBlock Text="&#xE8B7;" FontFamily="Segoe MDL2 Assets" 
                                            FontSize="32" VerticalAlignment="Center"
                                            Foreground="#D4840E"/>
-                                <TextBlock Text="&#xE710;" FontFamily="Segoe MDL2 Assets" 
-                                           FontSize="16" VerticalAlignment="Bottom"
-                                           Foreground="Green" FontWeight="Bold" Margin="-12,0,10,5"/>
-                                <TextBlock Text="Create New Project" 
+                                
+                                <TextBlock Text="Create New TestKit" 
                                            FontSize="16" VerticalAlignment="Center"
                                            FontWeight="SemiBold"/>
                             </StackPanel>
@@ -80,16 +95,14 @@
                                 <TextBlock Text="&#xE8B7;" FontFamily="Segoe MDL2 Assets" 
                                            FontSize="32" VerticalAlignment="Center"
                                            Foreground="#D4840E" Margin="0,0,10,0"/>
-                                <TextBlock Text="Open Project folder" 
+                                <TextBlock Text="Open TestKit folder" 
                                            FontSize="16" VerticalAlignment="Center"
                                            FontWeight="SemiBold"/>
                             </StackPanel>
                         </Button>
-
                     </StackPanel>
                 </GroupBox>
             </Grid>
-
         </Grid>
     </Grid>
 </Window>

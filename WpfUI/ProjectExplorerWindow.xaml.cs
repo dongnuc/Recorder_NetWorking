@@ -12,15 +12,25 @@ using Microsoft.Win32;
 using Microsoft.Extensions.DependencyInjection;
 using WpfUI.Services;
 using Common.Interfaces.Services;
+using System.Collections.Specialized;
 
 namespace WpfUI
 {
+    public class RecentProjectItem
+    {
+        public string Name { get; set; }
+        public string Path { get; set; }
+        public string Date { get; set; }
+    }
+
     public partial class ProjectExplorerWindow : Window
     {
         private readonly IOFolderHandler _folderHandler;
         private readonly IOFileHandler _fileHandler;
         private readonly IOFileManagement _fileManager;
         private readonly IServiceProvider _serviceProvider;
+
+        private bool _isNavigatingToMainMenu = false;
 
         public ProjectExplorerWindow(
             IServiceProvider serviceProvider,
@@ -38,20 +48,64 @@ namespace WpfUI
             LoadRecentProject();
         }
 
+        protected override void OnClosed(EventArgs e)
+        {
+            base.OnClosed(e);
+            if (!_isNavigatingToMainMenu)
+            {
+                Application.Current.Shutdown();
+            }
+        }
 
         private void LoadRecentProject()
         {
-            string recentPath = Settings.Default.ProjectPath;
-            if (!string.IsNullOrEmpty(recentPath) && Directory.Exists(recentPath))
+            LstRecentProjects.Items.Clear();
+
+            if (Settings.Default.RecentProjects == null)
             {
-                LstRecentProjects.Items.Clear();
-                LstRecentProjects.Items.Add(new ListBoxItem
-                {
-                    Content = System.IO.Path.GetFileName(recentPath),
-                    Tag = recentPath,
-                    ToolTip = recentPath
-                });
+                Settings.Default.RecentProjects = new StringCollection();
+                Settings.Default.Save();
             }
+
+            foreach (string path in Settings.Default.RecentProjects)
+            {
+                if (Directory.Exists(path))
+                {
+                    DateTime lastWrite = Directory.GetLastWriteTime(path);
+
+                    LstRecentProjects.Items.Add(new RecentProjectItem
+                    {
+                        Name = System.IO.Path.GetFileName(path),
+                        Path = path,
+                        Date = $"Last modified: {lastWrite:dd/MM/yyyy HH:mm}"
+                    });
+                }
+            }
+        }
+
+        private void AddToRecentProjects(string projectPath)
+        {
+            if (string.IsNullOrEmpty(projectPath)) return;
+
+            if (Settings.Default.RecentProjects == null)
+            {
+                Settings.Default.RecentProjects = new StringCollection();
+            }
+
+            if (Settings.Default.RecentProjects.Contains(projectPath))
+            {
+                Settings.Default.RecentProjects.Remove(projectPath);
+            }
+
+            Settings.Default.RecentProjects.Insert(0, projectPath);
+
+            while (Settings.Default.RecentProjects.Count > 10)
+            {
+                Settings.Default.RecentProjects.RemoveAt(10);
+            }
+
+            Settings.Default.ProjectPath = projectPath;
+            Settings.Default.Save();
         }
 
         private void BtnCreateNew_Click(object sender, RoutedEventArgs e)
@@ -66,6 +120,9 @@ namespace WpfUI
 
             if (setupWindow.ProjectCreatedSuccessfully)
             {
+                string newPath = Settings.Default.ProjectPath;
+                AddToRecentProjects(newPath);
+
                 OpenMainMenu(setupWindow.ViewModel);
             }
             else
@@ -91,26 +148,28 @@ namespace WpfUI
                     return;
                 }
 
-                Settings.Default.ProjectPath = projectRoot;
-                Settings.Default.Save();
-
+                AddToRecentProjects(projectRoot);
                 OpenMainMenu(projectRoot);
             }
         }
 
         private void LstRecentProjectsOpen(object sender, SelectionChangedEventArgs e)
         {
-            if (LstRecentProjects.SelectedItem is ListBoxItem selectedItem)
+            if (LstRecentProjects.SelectedItem is RecentProjectItem selectedItem)
             {
-                string projectRoot = selectedItem.Tag?.ToString();
+                string projectRoot = selectedItem.Path;
 
                 if (string.IsNullOrEmpty(projectRoot) || !Directory.Exists(projectRoot))
                 {
                     MessageBox.Show("Đường dẫn project này không còn tồn tại.", "Error");
-                    LstRecentProjects.Items.Remove(selectedItem);
+                    Settings.Default.RecentProjects.Remove(projectRoot);
+                    Settings.Default.Save();
+
+                    LoadRecentProject();
                     return;
                 }
 
+                AddToRecentProjects(projectRoot);
                 OpenMainMenu(projectRoot);
             }
         }
@@ -127,6 +186,8 @@ namespace WpfUI
 
         private void OpenMainMenu(MainMenuViewModel viewModel)
         {
+            _isNavigatingToMainMenu = true;
+
             this.Hide();
 
             var mainMenu = new MainMenu(
@@ -144,6 +205,7 @@ namespace WpfUI
 
         private void MainMenu_Closed(object sender, EventArgs e)
         {
+            _isNavigatingToMainMenu = false;
             LoadRecentProject();
             this.Show();
         }
