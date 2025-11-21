@@ -136,7 +136,7 @@ namespace Common.Helper
                 else
                 {
                     var serverManager = new AppSettingsManager(serverAppSettings);
-                    serverManager.UpdatePort(serverPort, createBackup: true);
+                    serverManager.UpdatePort(serverPort, createBackup: false);
                     LogManager.Instance.LogInfomation($"✅ Server appsettings updated - Port: {serverPort}");
                 }
 

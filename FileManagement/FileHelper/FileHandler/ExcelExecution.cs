@@ -17,7 +17,7 @@ namespace FileManagement.FileHelper.FileHandler
 
         public ExcelExecution()
         {
-            ExcelPackage.LicenseContext = LisenceContext.NonCommercial; 
+            ExcelPackage.LicenseContext = LisenceContext.NonCommercial;
         }
 
         public void ConfigForWritingFile<TConfig>(TConfig config, string type)
@@ -307,12 +307,12 @@ namespace FileManagement.FileHelper.FileHandler
 
                 foreach (var (sheetName, data) in sheetsData)
                 {
+                    var worksheet = package.Workbook.Worksheets.Add(sheetName);
                     if (data == null || !data.Any()) continue;
 
                     var firstItem = data.FirstOrDefault(d => d != null);
                     if (firstItem == null) continue;
 
-                    var worksheet = package.Workbook.Worksheets.Add(sheetName);
 
                     var properties = firstItem.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance);
 
@@ -353,23 +353,7 @@ namespace FileManagement.FileHelper.FileHandler
                         var column = worksheet.Column(i);
                         var propertyName = properties[i - 1].Name;
                         column.Style.WrapText = true;
-                        if ((propertyName.Equals("DataResponse", StringComparison.OrdinalIgnoreCase))
-                            || (propertyName.Equals("Output", StringComparison.OrdinalIgnoreCase)))
-                        {
-                            column.Style.WrapText = true;
-                            column.Width = MAX_COLUMN_WIDTH;
-                        }
-                        else if ((propertyName.Equals("DataTypeMiddleWare", StringComparison.OrdinalIgnoreCase)) ||
-                            (propertyName.Equals("DataRequest", StringComparison.OrdinalIgnoreCase)))
-                        {
-                            column.Style.WrapText = true;
-                            column.Width = MIN_COLUMN_WIDTH * 2;
-                        }
-                        else
-                        {
-                            column.AutoFit();
-                        }
-
+                        column.AutoFit();
                         if (column.Width > MAX_COLUMN_WIDTH) column.Width = MAX_COLUMN_WIDTH;
                         if (column.Width < MIN_COLUMN_WIDTH) column.Width = MIN_COLUMN_WIDTH;
                     }
