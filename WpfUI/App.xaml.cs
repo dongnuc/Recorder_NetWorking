@@ -4,6 +4,7 @@ using OfficeOpenXml;
 using System.Windows;
 using WpfUI.Services;
 
+
 namespace WpfUI
 {
     public partial class App : Application
@@ -23,9 +24,16 @@ namespace WpfUI
             try
             {
                 var fileHandler = _serviceProvider.GetRequiredService<IOFileHandler>();
+                var folderHandler = _serviceProvider.GetRequiredService<IOFolderHandler>();
                 var fileManagement = _serviceProvider.GetRequiredService<IOFileManagement>();
-                var setupWindow = new ProjectSetupWindow(fileHandler,_serviceProvider,fileManagement);
-                setupWindow.Show();
+
+                var explorerWindow = new ProjectExplorerWindow(
+                    _serviceProvider,
+                    folderHandler,
+                    fileHandler,
+                    fileManagement);
+
+                explorerWindow.Show();
             }
             catch (System.Exception ex)
             {

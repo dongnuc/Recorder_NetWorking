@@ -122,8 +122,8 @@ namespace Common.Helper
                 return after;
             }
 
-            string beforeTrimmed = before.TrimEnd();
-            string afterTrimmed = after.TrimEnd();
+            string beforeTrimmed = before;
+            string afterTrimmed = after;
 
             // Check if AFTER starts with BEFORE
             if (afterTrimmed.Length > beforeTrimmed.Length &&

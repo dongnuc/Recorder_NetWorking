@@ -313,6 +313,7 @@ namespace Middleware.Services
             try
             {
                 server = new TcpClient();
+                server.NoDelay = true; // Disable Nagle's algorithm for lower latency
 
                 LogManager.Instance.LogDebug($"🔌 Middleware: Client connected, attempting to connect to server at localhost:{_serverPort}");
 
@@ -349,13 +350,21 @@ namespace Middleware.Services
                     using var clientStream = client.GetStream();
                     using var serverStream = server.GetStream();
 
+                    // Use CancellationTokenSource to coordinate shutdown between both relay tasks
+                    using var relayCts = CancellationTokenSource.CreateLinkedTokenSource(token);
+
                     //  Start Client → Server relay task
                     var c2s = RelayTcpDataAsync(
                         clientStream,
                         serverStream,
                         transaction.Request,
-                        token,
-                        onComplete: null
+                        relayCts.Token,
+                        isRequest: true,
+                        onStreamClosed: () =>
+                        {
+                            LogManager.Instance.LogDebug("📭 Client closed connection");
+                            relayCts.Cancel(); // Signal the other relay to stop
+                        }
                     );
 
                     // Start Server → Client relay task
@@ -363,34 +372,41 @@ namespace Middleware.Services
                         serverStream,
                         clientStream,
                         transaction.Response,
-                        token,
-                        onComplete: () =>
+                        relayCts.Token,
+                        isRequest: false,
+                        onStreamClosed: () =>
                         {
-                            lock (transactionLock)
-                            {
-                                if (!transactionCompleted)
-                                {
-                                    transactionCompleted = true;
-
-                                    bool hasRequestData = !string.IsNullOrWhiteSpace(transaction.Request?.Body);
-                                    bool hasResponseData = !string.IsNullOrWhiteSpace(transaction.Response?.Body);
-
-                                    if (hasRequestData && hasResponseData)
-                                    {
-                                        LogManager.Instance.LogInfomation("🎉 Transaction completed - Request & Response received");
-                                        OnTransactionCompleted?.Invoke(transaction);
-                                    }
-                                    else
-                                    {
-                                        LogManager.Instance.LogDebug($"⚠️ Incomplete transaction - Request: {hasRequestData}, Response: {hasResponseData}");
-                                    }
-                                }
-                            }
+                            LogManager.Instance.LogDebug("📭 Server closed connection");
+                            relayCts.Cancel(); // Signal the other relay to stop
                         }
                     );
+
+                    // Wait for both relay tasks to complete
                     await Task.WhenAll(c2s, s2c);
 
                     LogManager.Instance.LogDebug($"✅ Middleware: Both relay tasks completed");
+
+                    // Raise transaction completed event after both relays finish
+                    lock (transactionLock)
+                    {
+                        if (!transactionCompleted)
+                        {
+                            transactionCompleted = true;
+
+                            bool hasRequestData = !string.IsNullOrWhiteSpace(transaction.Request?.Body);
+                            bool hasResponseData = !string.IsNullOrWhiteSpace(transaction.Response?.Body);
+
+                            if (hasRequestData && hasResponseData)
+                            {
+                                LogManager.Instance.LogInfomation("🎉 Transaction completed - Request & Response received");
+                                OnTransactionCompleted?.Invoke(transaction);
+                            }
+                            else
+                            {
+                                LogManager.Instance.LogDebug($"⚠️ Incomplete transaction - Request: {hasRequestData}, Response: {hasResponseData}");
+                            }
+                        }
+                    }
                 }
             }
             catch (OperationCanceledException)
@@ -415,57 +431,79 @@ namespace Middleware.Services
             {
                 try
                 {
+                    server?.Close();
                     server?.Dispose();
+                    client?.Close();
                     client?.Dispose();
                 }
                 catch { }
             }
         }
+
         private async Task RelayTcpDataAsync(
             NetworkStream from,
             NetworkStream to,
             object dataTarget,
             CancellationToken token,
-            Action onComplete = null) //  Callback khi hoàn thành
+            bool isRequest,
+            Action onStreamClosed = null)
         {
             var buffer = new byte[8192];
             int read;
-            bool hasReceivedData = false;
 
-            while ((read = await from.ReadAsync(buffer, 0, buffer.Length, token)) > 0)
+            try
             {
-
-                if (read == 0)
+                while (!token.IsCancellationRequested)
                 {
-                    if (hasReceivedData)
+                    read = await from.ReadAsync(buffer, 0, buffer.Length, token);
+
+                    if (read == 0)
                     {
-                        LogManager.Instance.LogDebug("📭 Stream closed after receiving data");
+                        // Stream closed gracefully
+                        LogManager.Instance.LogDebug($"📭 {(isRequest ? "Client" : "Server")} stream closed gracefully");
+                        onStreamClosed?.Invoke();
+                        break;
                     }
-                    break;
-                }
-                hasReceivedData = true;
-                await to.WriteAsync(buffer, 0, read, token);
 
-                var data = Encoding.UTF8.GetString(buffer, 0, read);
-                var dataType = DataInspector.DetecDataType(buffer.Take(read).ToArray());
+                    // Write data to the other side
+                    await to.WriteAsync(buffer, 0, read, token);
+                    await to.FlushAsync(token); // Ensure data is sent immediately
 
-                if (dataTarget is NetworkRequest request)
-                {
-                    // Client → Server
-                    request.Body = (request.Body ?? "") + data;
-                    request.DataType = dataType;
-                    request.ByteSize += read;
-                }
-                else if (dataTarget is NetworkResponse response)
-                {
-                    // Server → Client
-                    response.Body = (response.Body ?? "") + data;
-                    response.DataType = dataType;
-                    response.ByteSize += read;
-                    onComplete?.Invoke();
+                    // Capture data for logging
+                    var data = Encoding.UTF8.GetString(buffer, 0, read);
+                    var dataType = DataInspector.DetecDataType(buffer.Take(read).ToArray());
+
+                    if (dataTarget is NetworkRequest request)
+                    {
+                        // Client → Server
+                        request.Body = (request.Body ?? "") + data;
+                        request.DataType = dataType;
+                        request.ByteSize += read;
+                    }
+                    else if (dataTarget is NetworkResponse response)
+                    {
+                        // Server → Client
+                        response.Body = (response.Body ?? "") + data;
+                        response.DataType = dataType;
+                        response.ByteSize += read;
+                    }
                 }
             }
-
+            catch (OperationCanceledException)
+            {
+                LogManager.Instance.LogDebug($"🛑 {(isRequest ? "Client→Server" : "Server→Client")} relay cancelled");
+            }
+            catch (IOException ex) when (ex.InnerException is SocketException socketEx)
+            {
+                // Connection forcibly closed - this is expected when one side disconnects
+                LogManager.Instance.LogDebug($"🔌 {(isRequest ? "Client→Server" : "Server→Client")} connection closed: {socketEx.SocketErrorCode}");
+                onStreamClosed?.Invoke();
+            }
+            catch (Exception ex)
+            {
+                LogManager.Instance.LogError($"❌ {(isRequest ? "Client→Server" : "Server→Client")} relay error: {ex.Message}");
+                throw;
+            }
         }
         #endregion
     }

@@ -712,7 +712,7 @@ namespace WpfUI
                     return;
                 }
 
-                var detailsPath = Path.Combine(_testcasePath, "detail.xlsx");
+                var detailsPath = Path.Combine(_testcasePath, "Detail.xlsx");
 
 
                 ExcelExecution exporter = new ExcelExecution();
@@ -734,11 +734,15 @@ namespace WpfUI
             {
                 // Client buttons
                 BtnStartClient.Visibility = _isClientRunning ? Visibility.Collapsed : Visibility.Visible;
+                BtnStartClient.IsEnabled = true;
                 BtnCloseClient.Visibility = _isClientRunning ? Visibility.Visible : Visibility.Collapsed;
+                BtnCloseClient.IsEnabled = true;
 
                 // Server buttons
                 BtnStartServer.Visibility = _isServerRunning ? Visibility.Collapsed : Visibility.Visible;
+                BtnStartServer.IsEnabled = true;
                 BtnCloseServer.Visibility = _isServerRunning ? Visibility.Visible : Visibility.Collapsed;
+                BtnCloseServer.IsEnabled = true;
 
                 LogManager.Instance.LogDebug($" Buttons - Client running: {_isClientRunning}, Server running: {_isServerRunning}");
             });
@@ -773,6 +777,10 @@ namespace WpfUI
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
             }
+            finally
+            {
+                BtnCloseClient.IsEnabled = true;
+            }
         }
 
         private async void BtnCloseServer_Click(object sender, RoutedEventArgs e)
@@ -804,6 +812,10 @@ namespace WpfUI
                     "Error",
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
+            }
+            finally
+            {
+                BtnCloseServer.IsEnabled = true;
             }
         }
 

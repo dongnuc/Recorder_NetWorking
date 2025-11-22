@@ -38,7 +38,7 @@
 
         <Button Grid.Row="4"
                 x:Name="BtnCreateProject"
-                Content="Create TestKit"
+                Content="Create Project"
                 Height="50" FontSize="16" FontWeight="Bold"
                 Background="#27AE60" Foreground="White"
                 Click="BtnCreateProject_Click" 

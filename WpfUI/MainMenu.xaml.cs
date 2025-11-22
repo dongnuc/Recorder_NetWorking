@@ -11,6 +11,7 @@ using WpfUI.Properties;
 using WpfUI.Services;
 using WpfUI.ViewModels;
 
+
 namespace WpfUI
 {
     public class TabItemData
@@ -30,6 +31,8 @@ namespace WpfUI
         private Dictionary<Guid, TabItemData> _activeTabs = new Dictionary<Guid, TabItemData>();
         private IOFileHandler _fileHandler;
         private readonly IServiceProvider _serviceProvider;
+
+        // Constructor 4 tham số
         public MainMenu(MainMenuViewModel viewModel,
             IOFileHandler fileHandler,
             IServiceProvider serviceProvider,
@@ -57,7 +60,7 @@ namespace WpfUI
                     }
                     catch (System.ComponentModel.Win32Exception ex)
                     {
-                        MessageBox.Show($"Không thể mở file. Máy của bạn không có chương trình nào được liên kết với file '.xlsx'.\n\nLỗi: {ex.Message}",
+                        MessageBox.Show($"Không thể mở file.\n\nLỗi: {ex.Message}",
                             "Lỗi Mở File", MessageBoxButton.OK, MessageBoxImage.Error);
                     }
                     catch (Exception ex)
@@ -69,21 +72,26 @@ namespace WpfUI
             }
         }
 
+        // HÀM MỚI (Cho nút ⚙️ Config)
         private void BtnConfig_Click(object sender, RoutedEventArgs e)
         {
             var dialog = new ConfigWindow();
             dialog.Owner = this;
-            dialog.ShowDialog();
 
+            if (dialog.ShowDialog() == true)
+            {
+                // Nếu người dùng nhấn "Save", bảo ViewModel cập nhật TẤT CẢ các file Excel
+                _viewModel.UpdateAllQuestionConfigs();
+            }
         }
+
         private void TreeViewItem_ContextMenuOpening(object sender, ContextMenuEventArgs e)
         {
             var treeViewItem = sender as TreeViewItem;
             if (treeViewItem == null) return;
 
+
             var selectedItem = _viewModel.SelectedItem;
-
-
             if (selectedItem == null) return;
 
             var contextMenu = treeViewItem.ContextMenu;
@@ -131,7 +139,6 @@ namespace WpfUI
             else
             {
                 cmDeleteTestCase.Visibility = Visibility.Visible;
-                //Win.Content = fileDetailTextBlock;
             }
         }
 
@@ -140,7 +147,7 @@ namespace WpfUI
             if (_viewModel.SelectedItem == null || !_viewModel.SelectedItem.IsFolder ||
                 (_viewModel.RootItems.Count > 0 && _viewModel.SelectedItem.FullPath.Equals(_viewModel.RootItems[0].FullPath, StringComparison.OrdinalIgnoreCase)))
             {
-                MessageBox.Show("Bạn phải chọn một thư mục Question (không phải thư mục gốc) để tạo TestCase.", "Warning");
+                MessageBox.Show("Bạn phải chọn một thư mục Question để tạo TestCase.", "Warning");
                 return;
             }
 
@@ -151,24 +158,27 @@ namespace WpfUI
             string serverPath = Settings.Default.ServerExePath;
             if (string.IsNullOrEmpty(clientPath) || string.IsNullOrEmpty(serverPath))
             {
-                MessageBox.Show("Hãy cấu hình trước khi tạo testcase", "Warning");
+                MessageBox.Show("Hãy cấu hình (Config) đường dẫn Client/Server trước khi tạo testcase.", "Warning");
                 return;
             }
 
             if (dialog.ShowDialog() == true)
             {
                 string testcaseName = dialog.InputText.Trim();
-                var pathTestCase = await _viewModel?.CreateNewTestCase(dialog.InputText);
+                string testcasePath = await _viewModel?.CreateNewTestCase(dialog.InputText);
+
+                if (string.IsNullOrEmpty(testcasePath)) return;
+
                 LogManager.Instance.LogInfomation(dialog.InputText.ToString());
-                string testcasePath = pathTestCase;
                 bool isHttp = Settings.Default.Protocol == "HTTP";
-               await CreateRecorderTab(testcasePath,testcaseName, clientPath, serverPath,isHttp);
+
+                await CreateRecorderTab(testcasePath, testcaseName, clientPath, serverPath, isHttp);
             }
         }
 
         private void BtnExit_Click(object sender, RoutedEventArgs e)
         {
-            Application.Current.Shutdown();
+            this.Close();
         }
 
         private void BtnResetDb_Click(object sender, RoutedEventArgs e)
@@ -207,11 +217,12 @@ namespace WpfUI
             {
                 item.Focus();
                 item.IsSelected = true;
-                e.Handled = false; 
+                e.Handled = false;
             }
         }
-        #region recorder tab
-        private async Task CreateRecorderTab(string testcasePath, string testcaseName,string clientPath,string serverPath,bool isHttp)
+
+        #region recorder tab (Code cũ của bạn, giữ nguyên)
+        private async Task CreateRecorderTab(string testcasePath, string testcaseName, string clientPath, string serverPath, bool isHttp)
         {
             RecorderWindowScope scope = null;
             try
@@ -221,8 +232,8 @@ namespace WpfUI
                 scope = new RecorderWindowScope(_serviceProvider);
                 var processManager = scope.ServiceProvider.GetRequiredService<IProcessManager>();
                 var testkitManagerSerive = scope.ServiceProvider.GetRequiredService<ITestkitManagerService>();
-                var recorderWindow = new RecorderWindow(testcasePath,testcaseName, clientPath,
-                    serverPath,isHttp,
+                var recorderWindow = new RecorderWindow(testcasePath, testcaseName, clientPath,
+                    serverPath, isHttp,
                     processManager, _fileHandler, testkitManagerSerive);
 
                 var windowContent = recorderWindow.Content as FrameworkElement;
@@ -261,13 +272,14 @@ namespace WpfUI
             }
             catch (Exception ex)
             {
+                LogManager.Instance?.LogError($" Error creating tab: {ex.Message}");
             }
         }
 
         private void CloseTab_Click(object sender, RoutedEventArgs e)
         {
             var button = sender as Button;
-            if(button?.Tag is TabItem tabItem && tabItem.Tag is Guid tabId)
+            if (button?.Tag is TabItem tabItem && tabItem.Tag is Guid tabId)
             {
                 if (_activeTabs.TryGetValue(tabId, out var tabData))
                 {
@@ -292,7 +304,8 @@ namespace WpfUI
                 if (_activeTabs.TryGetValue(id, out var tabData))
                 {
                     LogManager.Instance?.LogInfomation($" Closing tab: {tabData.TestCaseName} (ID: {id})");
-                    await tabData.RecorderWindow.CleanupAsync();
+                    // (Sửa lỗi: Xóa dòng lặp)
+                    // await tabData.RecorderWindow.CleanupAsync(); 
                     if (tabData.RecorderWindow != null)
                     {
                         try
@@ -307,11 +320,7 @@ namespace WpfUI
                         }
                     }
 
-
-                    // Remove from UI
                     TestCaseTabControl.Items.Remove(tabData.TabItem);
-
-                    // Remove from dictionary
                     _activeTabs.Remove(id);
 
                     if (_activeTabs.Count == 0)
@@ -338,9 +347,9 @@ namespace WpfUI
         private RecorderWindow GetCurrentRecorderWindowns()
         {
             var selectedTab = TestCaseTabControl.SelectedItem as TabItem;
-            if(selectedTab?.Tag is Guid tabId)
+            if (selectedTab?.Tag is Guid tabId)
             {
-                if(_activeTabs.TryGetValue(tabId, out var tabData))
+                if (_activeTabs.TryGetValue(tabId, out var tabData))
                 {
                     return tabData.RecorderWindow;
                 }
@@ -355,6 +364,7 @@ namespace WpfUI
             {
                 if (_activeTabs.TryGetValue(tabId, out var tabData))
                 {
+                    // (Logic khi chọn tab)
                 }
             }
         }

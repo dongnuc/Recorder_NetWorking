@@ -1,14 +1,13 @@
 ﻿<Application x:Class="WpfUI.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:converters="clr-namespace:WpfUI.Converters">
+             xmlns:local="clr-namespace:WpfUI"
+             xmlns:converters="clr-namespace:WpfUI.Converters"
+             
+             >
 
     <Application.Resources>
         <ResourceDictionary>
-            <ResourceDictionary.MergedDictionaries>
-                <!-- Add other resource dictionaries here if needed -->
-            </ResourceDictionary.MergedDictionaries>
-
             <converters:FolderToIconConverter x:Key="FolderToIconConverter" />
         </ResourceDictionary>
     </Application.Resources>
