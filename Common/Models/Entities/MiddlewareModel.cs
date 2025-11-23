@@ -7,6 +7,7 @@
             public string Protocol { get; set; }
             public NetworkRequest Request { get; set; }
             public NetworkResponse Response { get; set; }
+            public ConnectionTraceManager? ConnectionTraces { get; set; }
         }
 
         public class NetworkRequest

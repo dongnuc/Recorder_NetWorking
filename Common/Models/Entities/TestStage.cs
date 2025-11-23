@@ -8,7 +8,8 @@ namespace Common.Models.Entities
         public Client? Client { get; set; }
         public Server? Server { get; set; } 
         public Database? Database { get; set; } 
-        public Network? Network { get; set; } 
+        public Network? Network { get; set; }
+        public ConnectionTraceManager? ConnectionTraces { get; set; }
 
     }
 

@@ -1,5 +1,6 @@
 ﻿using Common.Helper;
 using Common.Logging;
+using Common.Models.Entities;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -303,12 +304,16 @@ namespace Middleware.Services
             {
                 Protocol = "TCP",
                 Request = new NetworkRequest { Method = "TCP" },
-                Response = new NetworkResponse { StatusCode = "OK" }
+                Response = new NetworkResponse { StatusCode = "OK" },
+                ConnectionTraces = new ConnectionTraceManager(0) // Stage will be set later
             };
 
             var transactionLock = new object();
             bool transactionCompleted = false;
             TcpClient server = null;
+
+            // Trace: Client connection initiated
+            transaction.ConnectionTraces.AddClientTrace(ConnectionState.New, "Client connected to middleware");
 
             try
             {
@@ -319,12 +324,23 @@ namespace Middleware.Services
 
                 try
                 {
+                    // Trace: Attempting to connect to server
+                    transaction.ConnectionTraces.AddServerTrace(ConnectionState.ConnectingToServer, $"Connecting to server at localhost:{_serverPort}");
+                    
                     //  Connect to actual server
                     await server.ConnectAsync(IPAddress.Loopback, _serverPort, token);
+                    
+                    // Trace: Server connection established
+                    transaction.ConnectionTraces.AddServerTrace(ConnectionState.Established, "Connected to server successfully");
+                    transaction.ConnectionTraces.AddClientTrace(ConnectionState.Established, "Both connections established");
+                    
                     LogManager.Instance.LogInfomation($"✅ Middleware: Successfully connected to server at localhost:{_serverPort}");
                 }
                 catch (SocketException ex)
                 {
+                    // Trace: Server connection failed
+                    transaction.ConnectionTraces.AddServerTrace(ConnectionState.Failed, $"Connection failed: {ex.Message} (SocketErrorCode: {ex.SocketErrorCode})");
+                    
                     LogManager.Instance.LogError($"❌ Middleware: Failed to connect to server at localhost:{_serverPort}");
                     LogManager.Instance.LogError($"   Error: {ex.Message} (SocketErrorCode: {ex.SocketErrorCode})");
 
@@ -335,6 +351,8 @@ namespace Middleware.Services
                         var errorMsg = Encoding.UTF8.GetBytes($"ERROR: Cannot connect to server on port {_serverPort}\r\n");
                         await errorStream.WriteAsync(errorMsg, 0, errorMsg.Length, token);
                         await errorStream.FlushAsync(token);
+                        
+                        transaction.ConnectionTraces.AddClientTrace(ConnectionState.ClosedWithError, "Client notified of connection failure");
                     }
                     catch { }
 
@@ -358,10 +376,12 @@ namespace Middleware.Services
                         clientStream,
                         serverStream,
                         transaction.Request,
+                        transaction.ConnectionTraces,
                         relayCts.Token,
                         isRequest: true,
                         onStreamClosed: () =>
                         {
+                            transaction.ConnectionTraces.AddClientTrace(ConnectionState.ClosedByClient, "Client closed the connection");
                             LogManager.Instance.LogDebug("📭 Client closed connection");
                             relayCts.Cancel(); // Signal the other relay to stop
                         }
@@ -372,10 +392,12 @@ namespace Middleware.Services
                         serverStream,
                         clientStream,
                         transaction.Response,
+                        transaction.ConnectionTraces,
                         relayCts.Token,
                         isRequest: false,
                         onStreamClosed: () =>
                         {
+                            transaction.ConnectionTraces.AddServerTrace(ConnectionState.ClosedByServer, "Server closed the connection");
                             LogManager.Instance.LogDebug("📭 Server closed connection");
                             relayCts.Cancel(); // Signal the other relay to stop
                         }
@@ -383,6 +405,10 @@ namespace Middleware.Services
 
                     // Wait for both relay tasks to complete
                     await Task.WhenAll(c2s, s2c);
+
+                    // Trace: Connection closing normally
+                    transaction.ConnectionTraces.AddClientTrace(ConnectionState.Closing, "Connection closing gracefully");
+                    transaction.ConnectionTraces.AddServerTrace(ConnectionState.Closing, "Connection closing gracefully");
 
                     LogManager.Instance.LogDebug($"✅ Middleware: Both relay tasks completed");
 
@@ -399,6 +425,7 @@ namespace Middleware.Services
                             if (hasRequestData && hasResponseData)
                             {
                                 LogManager.Instance.LogInfomation("🎉 Transaction completed - Request & Response received");
+                                LogManager.Instance.LogDebug(transaction.ConnectionTraces.GetTraceSummary());
                                 OnTransactionCompleted?.Invoke(transaction);
                             }
                             else
@@ -411,10 +438,14 @@ namespace Middleware.Services
             }
             catch (OperationCanceledException)
             {
+                transaction.ConnectionTraces.AddClientTrace(ConnectionState.Closing, "Operation cancelled");
+                transaction.ConnectionTraces.AddServerTrace(ConnectionState.Closing, "Operation cancelled");
                 LogManager.Instance.LogDebug($"🛑 Middleware: TCP connection cancelled");
             }
             catch (Exception ex)
             {
+                transaction.ConnectionTraces.AddClientTrace(ConnectionState.ClosedWithError, $"Error: {ex.Message}");
+                transaction.ConnectionTraces.AddServerTrace(ConnectionState.ClosedWithError, $"Error: {ex.Message}");
                 LogManager.Instance.LogError($"❌ Middleware: TCP connection error: {ex.Message}");
                 LogManager.Instance.LogError($"   Stack trace: {ex.StackTrace}");
 
@@ -444,6 +475,7 @@ namespace Middleware.Services
             NetworkStream from,
             NetworkStream to,
             object dataTarget,
+            ConnectionTraceManager? connectionTraces,
             CancellationToken token,
             bool isRequest,
             Action onStreamClosed = null)

@@ -67,6 +67,12 @@ namespace TestKitManagement.Services
             };
 
             currentStage.Network = network;
+            
+            // Store connection traces if available
+            if (transaction.ConnectionTraces != null)
+            {
+                currentStage.ConnectionTraces = transaction.ConnectionTraces;
+            }
             // Notify UI
         }
         /// Flush tất cả pending transactions vào current stage
