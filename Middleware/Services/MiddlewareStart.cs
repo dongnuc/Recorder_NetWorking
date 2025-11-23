@@ -376,7 +376,6 @@ namespace Middleware.Services
                         clientStream,
                         serverStream,
                         transaction.Request,
-                        transaction.ConnectionTraces,
                         relayCts.Token,
                         isRequest: true,
                         onStreamClosed: () =>
@@ -392,7 +391,6 @@ namespace Middleware.Services
                         serverStream,
                         clientStream,
                         transaction.Response,
-                        transaction.ConnectionTraces,
                         relayCts.Token,
                         isRequest: false,
                         onStreamClosed: () =>
@@ -475,7 +473,6 @@ namespace Middleware.Services
             NetworkStream from,
             NetworkStream to,
             object dataTarget,
-            ConnectionTraceManager? connectionTraces,
             CancellationToken token,
             bool isRequest,
             Action onStreamClosed = null)
