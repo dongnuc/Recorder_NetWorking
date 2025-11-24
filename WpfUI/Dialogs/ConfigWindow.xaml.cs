@@ -4,7 +4,7 @@ using System;
 using System.Windows;
 using WpfUI.Properties;
 
-namespace WpfUI.Dialogs 
+namespace WpfUI.Dialogs
 {
     public partial class ConfigWindow : Window
     {
@@ -25,7 +25,7 @@ namespace WpfUI.Dialogs
             }
             else
             {
-                RbHttp.IsChecked = true;
+                RbHttp.IsChecked = true; 
             }
         }
 
@@ -45,16 +45,15 @@ namespace WpfUI.Dialogs
         {
             try
             {
-                string newProtocol = (RbTcp.IsChecked == true) ? "TCP" : "HTTP";
-
                 Settings.Default.ClientExePath = TxtClientPath.Text;
                 Settings.Default.ServerExePath = TxtServerPath.Text;
-                Settings.Default.Protocol = newProtocol;
+                Settings.Default.Protocol = (RbTcp.IsChecked == true) ? "TCP" : "HTTP";
+
                 Settings.Default.Save();
 
-                LogManager.Instance.LogInfomation($"Global Configuration updated. Protocol={newProtocol}");
+                LogManager.Instance.LogInfomation($"⚙️ Settings saved. Protocol={Settings.Default.Protocol}");
 
-                this.DialogResult = true; 
+                this.DialogResult = true;
                 this.Close();
             }
             catch (Exception ex)

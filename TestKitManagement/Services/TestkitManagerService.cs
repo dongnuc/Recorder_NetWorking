@@ -25,10 +25,11 @@ namespace TestKitManagement.Services
         public event Action<Dictionary<int, TestStage>> OnStagesChanged;
         public event Action<int> OnStageCreated;
         public event Action<int> OnStageUpdated;
-
+        public bool isCaptureClient = false;
+        public bool isCaptureServer = false;
 
         #region Method Helper
-        private TestStage CreateNewStage(int stageIndex,string input)
+        private TestStage CreateNewStage(int stageIndex, string input)
         {
             var newStage = new TestStage();
             var inputClient = new User
@@ -143,7 +144,7 @@ namespace TestKitManagement.Services
                 LogManager.Instance.LogWarning("Received null transaction from Middleware");
                 return;
             }
-            
+
             lock (_lock)
             {
                 _pendingTransactions.Enqueue(transaction);
@@ -187,7 +188,7 @@ namespace TestKitManagement.Services
 
         public void CreateInitialStage(string action)
         {
-            if(_currentStageIndex <= 0)
+            if (_currentStageIndex <= 0)
             {
                 _currentStageIndex = 1;
             }
@@ -196,7 +197,7 @@ namespace TestKitManagement.Services
                 _currentStageIndex++;
             }
 
-                var intitalStage = new TestStage();
+            var intitalStage = new TestStage();
             var initialInput = new User
             {
                 Stage = _currentStageIndex,
@@ -212,7 +213,7 @@ namespace TestKitManagement.Services
 
         public void IncrementStage()
         {
-           if(_currentStageIndex >= 1)
+            if (_currentStageIndex >= 1)
             {
                 _currentStageIndex++;
             }
@@ -228,10 +229,27 @@ namespace TestKitManagement.Services
 
             if (currentStage.Client != null)
             {
+
                 currentStage.Client.Console = output;
             }
             else
             {
+                if (!isCaptureClient)
+                {
+                    foreach (var testStage in _testStages.Values)
+                    {
+                        if (testStage.User.Action == ActionKeywords.START_CLIENT)
+                        {
+                            testStage.Client = new Client
+                            {
+                                Stage = testStage.User.Stage,
+                                Console = output,
+                            };
+                            isCaptureClient = true;
+                            return;
+                        }
+                    }
+                }
                 currentStage.Client = new Client
                 {
                     Stage = _currentStageIndex,
@@ -255,12 +273,33 @@ namespace TestKitManagement.Services
             }
             else
             {
-                currentStage.Server = new Server
+
+                if (!isCaptureServer)
                 {
-                    Stage = _currentStageIndex,
-                    Console = output ?? string.Empty
-                };
-            } 
+                    foreach (var testStage in _testStages.Values)
+                    {
+                        if (testStage.User!.Action.Equals(ActionKeywords.START_SERVER))
+                        {
+                            testStage.Server = new Server
+                            {
+                                Stage = testStage.User.Stage,
+                                Console = output
+                            };
+                            isCaptureServer = true;
+                        }
+
+                    }
+                }
+                else
+                {
+                    currentStage.Server = new Server
+                    {
+                        Stage = _currentStageIndex,
+                        Console = output ?? string.Empty
+                    };
+                }
+
+            }
             // Notify UI
             OnServerOutputReceived?.Invoke(output);
             OnStageUpdated?.Invoke(_currentStageIndex);
@@ -269,7 +308,7 @@ namespace TestKitManagement.Services
 
         public void ReceiveTransaction(NetworkTransaction transaction)
         {
-            if(transaction == null)
+            if (transaction == null)
             {
                 return;
             }
