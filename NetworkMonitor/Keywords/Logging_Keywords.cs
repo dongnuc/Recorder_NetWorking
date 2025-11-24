@@ -14,18 +14,18 @@ namespace NetworkMonitor.Keywords
         public const string LogSeparator = "--------------------------------------------------------------------------------";
         public const int LogSeparatorLength = 80;
 
-        // Truncation Messages
-        public const string TruncatedSuffix = " ... (truncated)";
+        // Truncation Messages - disabled (no suffixes)
+        public const string TruncatedSuffix = "";
         public const string HexPrefix = "hex:";
-        public const string HexSuffix = "...";
+        public const string HexSuffix = "";
 
         // Debug Messages
         public const string DebugPreviewPrefix = "DEBUG preview: ";
 
-        // Payload Display
-        public const int MaxBodyDisplayLength = 500;
-        public const int MaxDebugPreviewLength = 1000;
-        public const int MaxFirstLineLength = 200;
-        public const int MaxHexPreviewLength = 64;
+        // Payload Display - unlimited
+        public const int MaxBodyDisplayLength = int.MaxValue;
+        public const int MaxDebugPreviewLength = int.MaxValue;
+        public const int MaxFirstLineLength = int.MaxValue;
+        public const int MaxHexPreviewLength = int.MaxValue;
     }
 }
