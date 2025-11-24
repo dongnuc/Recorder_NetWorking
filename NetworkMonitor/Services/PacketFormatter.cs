@@ -2,6 +2,7 @@ using NetworkMonitor.Abstractions;
 using NetworkMonitor.Keywords;
 using PacketDotNet;
 using System.Text;
+using System.Text.Json;
 
 namespace NetworkMonitor.Services
 {
@@ -108,28 +109,25 @@ namespace NetworkMonitor.Services
             if (tcp.Acknowledgment) flags.Add(Network_Keywords.TcpFlagACK);
             if (tcp.Urgent) flags.Add(Network_Keywords.TcpFlagURG);
             
-            // Check ECE and CWR flags using raw flags value (bits 6 and 7)
+            // Check ECE and CWR flags using raw flags value
+            // According to RFC 3168: ECE is bit 8 (0x100) and CWR is bit 9 (0x200)
             ushort flagsValue = tcp.Flags;
-            if ((flagsValue & 0x40) != 0) flags.Add(Network_Keywords.TcpFlagECE); // Bit 6
-            if ((flagsValue & 0x80) != 0) flags.Add(Network_Keywords.TcpFlagCWR); // Bit 7
+            if ((flagsValue & 0x100) != 0) flags.Add(Network_Keywords.TcpFlagECE); // ECE - Bit 8
+            if ((flagsValue & 0x200) != 0) flags.Add(Network_Keywords.TcpFlagCWR); // CWR - Bit 9
 
             return flags.Count > 0 ? string.Join(", ", flags) : "None";
         }
 
         /// <summary>
-        /// Escapes special characters for JSON string formatting.
+        /// Escapes special characters for JSON string formatting using proper JSON encoding.
         /// </summary>
         private static string EscapeJson(string str)
         {
             if (string.IsNullOrEmpty(str))
                 return string.Empty;
 
-            return str
-                .Replace("\\", "\\\\")
-                .Replace("\"", "\\\"")
-                .Replace("\n", "\\n")
-                .Replace("\r", "\\r")
-                .Replace("\t", "\\t");
+            // Use System.Text.Json for proper JSON escaping
+            return JsonSerializer.Serialize(str).Trim('"');
         }
     }
 }
