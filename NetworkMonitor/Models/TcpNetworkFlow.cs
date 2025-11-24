@@ -6,7 +6,12 @@ namespace NetworkMonitor.Models
     public class TcpNetworkFlow
     {
         /// <summary>
-        /// Gets or sets informational description of the packet (e.g., timestamp and type).
+        /// Gets or sets the timestamp when the packet was captured.
+        /// </summary>
+        public string? Time { get; set; }
+
+        /// <summary>
+        /// Gets or sets informational description of the packet (e.g., "TCP", "HTTP Request", "HTTP Response").
         /// </summary>
         public string? Info { get; set; }
 
