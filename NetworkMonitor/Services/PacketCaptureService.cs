@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using NetworkMonitor.Abstractions;
 using NetworkMonitor.Keywords;
+using NetworkMonitor.Models;
 
 namespace NetworkMonitor.Services
 {
@@ -301,7 +302,8 @@ namespace NetworkMonitor.Services
                     DecodedPayload = decodedPayload,
                     ProtocolLabel = protocolLabel,
                     Packet = packet,
-                    TcpPacket = tcp
+                    TcpPacket = tcp,
+                    Timestamp = raw.Timeval.Date
                 };
 
                 // Store captured packet for service retrieval
@@ -310,8 +312,11 @@ namespace NetworkMonitor.Services
                 // Log captured packet if logging is enabled
                 if (_logCapturedPackets)
                 {
-                    var packetSummary = PacketFormatter.FormatPacketSummary(eventArgs);
-                    RaiseLogMessage($"[Packet Captured] {packetSummary}", false);
+                    // Output as structured network flow object
+                    var monitoredPort = GetMatchingMonitoredPort(eventArgs.SourcePort, eventArgs.DestinationPort);
+                    object flow = ConvertPacketToNetworkFlow(eventArgs, monitoredPort);
+                    var flowJson = NetworkFlowConverter.ToJson(flow);
+                    RaiseLogMessage($"[Network Flow Captured]\n{flowJson}", false);
                 }
 
                 // Raise packet captured event
@@ -476,6 +481,144 @@ namespace NetworkMonitor.Services
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// Gets all captured packets as structured network flow objects.
+        /// </summary>
+        /// <returns>List of network flow objects (TcpNetworkFlow or HttpNetworkFlow).</returns>
+        public List<object> GetCapturedNetworkFlows()
+        {
+            lock (_packetsLock)
+            {
+                return ConvertToNetworkFlows(_capturedPackets);
+            }
+        }
+
+        /// <summary>
+        /// Gets the most recent captured packets as structured network flow objects.
+        /// </summary>
+        /// <param name="count">Number of recent packets to retrieve.</param>
+        /// <returns>List of network flow objects.</returns>
+        public List<object> GetRecentNetworkFlows(int count)
+        {
+            lock (_packetsLock)
+            {
+                var recentPackets = _capturedPackets
+                    .Skip(Math.Max(0, _capturedPackets.Count - count))
+                    .ToList();
+                return ConvertToNetworkFlows(recentPackets);
+            }
+        }
+
+        /// <summary>
+        /// Gets all captured packets as JSON strings representing structured network flows.
+        /// </summary>
+        /// <returns>List of JSON strings.</returns>
+        public List<string> GetCapturedNetworkFlowsAsJson()
+        {
+            lock (_packetsLock)
+            {
+                return ConvertToNetworkFlowsJson(_capturedPackets);
+            }
+        }
+
+        /// <summary>
+        /// Gets the most recent captured packets as JSON strings representing structured network flows.
+        /// </summary>
+        /// <param name="count">Number of recent packets to retrieve.</param>
+        /// <returns>List of JSON strings.</returns>
+        public List<string> GetRecentNetworkFlowsAsJson(int count)
+        {
+            lock (_packetsLock)
+            {
+                var recentPackets = _capturedPackets
+                    .Skip(Math.Max(0, _capturedPackets.Count - count))
+                    .ToList();
+                return ConvertToNetworkFlowsJson(recentPackets);
+            }
+        }
+
+        /// <summary>
+        /// Converts a list of packet event args to network flow objects.
+        /// </summary>
+        private List<object> ConvertToNetworkFlows(List<PacketCapturedEventArgs> packets)
+        {
+            var result = new List<object>();
+
+            foreach (var packet in packets)
+            {
+                var monitoredPort = GetMatchingMonitoredPort(packet.SourcePort, packet.DestinationPort);
+                result.Add(ConvertPacketToNetworkFlow(packet, monitoredPort));
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Converts a list of packet event args to network flow JSON strings.
+        /// </summary>
+        private List<string> ConvertToNetworkFlowsJson(List<PacketCapturedEventArgs> packets)
+        {
+            var result = new List<string>();
+
+            foreach (var packet in packets)
+            {
+                var monitoredPort = GetMatchingMonitoredPort(packet.SourcePort, packet.DestinationPort);
+                object flow = ConvertPacketToNetworkFlow(packet, monitoredPort);
+                result.Add(NetworkFlowConverter.ToJson(flow));
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Converts a single packet to the appropriate network flow object (TCP or HTTP).
+        /// </summary>
+        private object ConvertPacketToNetworkFlow(PacketCapturedEventArgs packet, int? monitoredPort)
+        {
+            if (packet.ProtocolLabel == Network_Keywords.ProtocolHTTP)
+            {
+                return NetworkFlowConverter.ToHttpNetworkFlow(packet, monitoredPort);
+            }
+            else
+            {
+                return NetworkFlowConverter.ToTcpNetworkFlow(packet, monitoredPort);
+            }
+        }
+
+        /// <summary>
+        /// Gets the first monitored port if available, or null if monitoring all ports.
+        /// </summary>
+        private int? GetMonitoredPort()
+        {
+            if (_monitorAllPorts || _monitoredPorts == null || _monitoredPorts.Count == 0)
+                return null;
+
+            // Return the first monitored port for simplicity
+            // This will be used by helper methods that need a port reference
+            return _monitoredPorts[0];
+        }
+
+        /// <summary>
+        /// Gets the monitored port that matches either the source or destination port.
+        /// Returns null if no monitored port matches.
+        /// </summary>
+        private int? GetMatchingMonitoredPort(int sourcePort, int destinationPort)
+        {
+            if (_monitorAllPorts || _monitoredPorts == null || _monitoredPorts.Count == 0)
+                return null;
+
+            // Check if source port is a monitored port
+            if (_monitoredPorts.Contains(sourcePort))
+                return sourcePort;
+
+            // Check if destination port is a monitored port
+            if (_monitoredPorts.Contains(destinationPort))
+                return destinationPort;
+
+            // No match found, but we have monitored ports - return first as fallback
+            return _monitoredPorts.Count > 0 ? _monitoredPorts[0] : null;
         }
     }
 }

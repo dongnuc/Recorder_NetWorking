@@ -22,12 +22,12 @@ namespace NetworkMonitor.Keywords
         public const string TcpFlagURG = "URG";
         /// <summary>
         /// ECE (ECN-Echo): Indicates that the TCP peer is ECN capable during 3-way handshake.
-        /// Used for explicit congestion notification.
+        /// Used for explicit congestion notification. Bit 6 (0x40).
         /// </summary>
         public const string TcpFlagECE = "ECE";
         /// <summary>
         /// CWR (Congestion Window Reduced): Indicates that the sender reduced its sending rate.
-        /// Used in response to receiving a packet with the ECE flag set.
+        /// Used in response to receiving a packet with the ECE flag set. Bit 7 (0x80).
         /// </summary>
         public const string TcpFlagCWR = "CWR";
 
