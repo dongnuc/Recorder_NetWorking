@@ -75,7 +75,7 @@ namespace ProcessManagement.Services
             await Task.Delay(3000);
 
             //  Capture INITIAL output (lần đầu tiên)
-            await CaptureAndRaiseInitialOutputAsync(child, mutex, name, isClient);
+            //await CaptureAndRaiseInitialOutputAsync(child, mutex, name, isClient);
 
             // Start Enter key monitoring (chỉ cho client)
             var cts = new CancellationTokenSource();
@@ -87,54 +87,6 @@ namespace ProcessManagement.Services
             LogManager.Instance.LogInfomation($"✅ {name} process started with PID: {child.processId}");
 
             return (child, mutex, cts);
-        }
-
-        /// <summary>
-        /// ✅ Capture initial output khi start process (lần đầu tiên)
-        /// </summary>
-        private async Task CaptureAndRaiseInitialOutputAsync(
-            ChildProcess child,
-            IntPtr mutex,
-            string processName,
-            bool isClient)
-        {
-            try
-            {
-                LogManager.Instance.LogInfomation($"Capturing initial output for {processName}");
-
-                string initialOutput = await _consolePoller.CaptureCurrentConsoleAsync(
-                    child,
-                    mutex,
-                    expandBuffer: true  // Expand buffer lần đầu
-                );
-
-                if (!string.IsNullOrWhiteSpace(initialOutput))
-                {
-                    _previousSnapshots[processName] = initialOutput;
-
-                    LogManager.Instance.LogInfomation($" Initial output captured ({initialOutput.Length} chars)");
-                    LogManager.Instance.LogDebug($" Initial content:\n{initialOutput}");
-
-                    if (isClient)
-                    {
-                        _testkitManagerService.ReceiveClientOutput(initialOutput);
-                    }
-                    else
-                    {
-                        _testkitManagerService.ReceiveServerOutput(initialOutput);
-                    }
-                }
-                else
-                {
-                    LogManager.Instance.LogWarning($" No initial output for {processName}");
-                    _previousSnapshots[processName] = string.Empty;
-                }
-            }
-            catch (Exception ex)
-            {
-                LogManager.Instance.LogError($"Error capturing initial output for {processName}: {ex.Message}");
-                _previousSnapshots[processName] = string.Empty;
-            }
         }
 
         /// <summary>
@@ -277,7 +229,12 @@ namespace ProcessManagement.Services
             {
                 //Capture BEFORE
                 LogManager.Instance.LogDebug($" 1: Capturing BEFORE snapshot");
-                string bufferBefore = _previousSnapshots[processName];
+                string bufferBefore = "";
+                if (_previousSnapshots.ContainsKey(processName))
+                {
+
+                     bufferBefore = _previousSnapshots[processName] ?? "";
+                }
 
 
                 // Capture AFTER 
@@ -300,18 +257,26 @@ namespace ProcessManagement.Services
 
                 if (isClient)
                 {
-                    var (input, outputClient) = DataInspector.SplitInputFromOutput(extractedCapture);
-                    if (input != null && !string.IsNullOrWhiteSpace(input))
+                    // first visit when start 
+                    if (bufferBefore.Length <= 0 || bufferBefore == null)
                     {
-                        _testkitManagerService.ReceiveUserInput(input,ActionKeywords.INPUT);
+                        _testkitManagerService.ReceiveClientOutput(bufferAfterInput);
                     }
                     else
                     {
-                        _testkitManagerService.ReceiveUserInput("", "UserInput");
-                        LogManager.Instance.LogWarning($"Input is null");
+                        var (input, outputClient) = DataInspector.SplitInputFromOutput(extractedCapture);
+                        if (input != null && !string.IsNullOrWhiteSpace(input))
+                        {
+                            _testkitManagerService.ReceiveUserInput(input, ActionKeywords.INPUT);
+                        }
+                        else
+                        {
+                            _testkitManagerService.ReceiveUserInput("", "UserInput");
+                            LogManager.Instance.LogWarning($"Input is null");
+                        }
+                        LogManager.Instance.LogDebug($" STEP 5: Raising OnUserInput event");
+                        _testkitManagerService.ReceiveClientOutput(outputClient);
                     }
-                    LogManager.Instance.LogDebug($" STEP 5: Raising OnUserInput event");
-                    _testkitManagerService.ReceiveClientOutput(outputClient);
                 }
                 else
                 {
@@ -440,14 +405,14 @@ namespace ProcessManagement.Services
                 LogManager.Instance.LogError($"Error closing process {child.name}: {ex.Message}");
             }
         }
-      
+
         #endregion
 
         #region Cleanup
 
-            /// <summary>
-            /// Cleanup all monitoring tasks
-            /// </summary>
+        /// <summary>
+        /// Cleanup all monitoring tasks
+        /// </summary>
         public void Dispose()
         {
             LogManager.Instance.LogDebug("ProcessManager disposing...");
