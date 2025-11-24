@@ -25,6 +25,28 @@ namespace Middleware.Services
 
         #endregion
 
+        #region Public Methods
+
+        /// <summary>
+        /// Get the server port that the middleware is forwarding to
+        /// </summary>
+        /// <returns>The server port number</returns>
+        public int GetServerPort()
+        {
+            return _serverPort;
+        }
+
+        /// <summary>
+        /// Get the proxy port that the middleware is listening on
+        /// </summary>
+        /// <returns>The proxy port number</returns>
+        public int GetProxyPort()
+        {
+            return _proxyPort;
+        }
+
+        #endregion
+
         #region Events
         // Event raised when network request is captured (Client → Server)
         public event Action<NetworkRequest> OnRequestCaptured;
