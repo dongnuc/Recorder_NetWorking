@@ -100,7 +100,6 @@ namespace Common.Helper
                 string updatedJson = jsonNode.ToJsonString(_jsonOptions);
                 File.WriteAllText(_filePath, updatedJson);
 
-                LogManager.Instance.LogInfomation($"Updated Port to {newPort} in {Path.GetFileName(_filePath)}");
                 return true;
             }
             catch (Exception ex)
@@ -137,7 +136,7 @@ namespace Common.Helper
                 {
                     var serverManager = new AppSettingsManager(serverAppSettings);
                     serverManager.UpdatePort(serverPort, createBackup: false);
-                    LogManager.Instance.LogInfomation($"✅ Server appsettings updated - Port: {serverPort}");
+                    LogManager.Instance.LogInfomation($"Server appsettings updated - Port: {serverPort}");
                 }
 
                 return true;

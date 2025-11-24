@@ -415,7 +415,6 @@ namespace ProcessManagement.Services
         /// </summary>
         public void Dispose()
         {
-            LogManager.Instance.LogDebug("ProcessManager disposing...");
 
             // Stop all monitoring tasks
             foreach (var kvp in _monitoringTasks.ToList())
@@ -432,7 +431,6 @@ namespace ProcessManagement.Services
 
         public async Task CloseClientAsync()
         {
-            LogManager.Instance.LogInfomation(" Closing Client process...");
 
             try
             {
@@ -468,7 +466,6 @@ namespace ProcessManagement.Services
 
         public async Task CloseServerAsync()
         {
-            LogManager.Instance.LogInfomation(" Closing Server process...");
 
             try
             {

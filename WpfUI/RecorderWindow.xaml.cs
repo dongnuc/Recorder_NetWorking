@@ -472,22 +472,21 @@ namespace WpfUI
                 base.OnClosing(e);
                 return;
             }
-            e.Cancel = true;
-            var result = MessageBox.Show(
-                "Stop recording and close?\n\nAll processes will be terminated.",
-                "Confirm Close",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Question);
+            //e.Cancel = true;
+            //var result = MessageBox.Show(
+            //    "Stop recording and close?\n\nAll processes will be terminated.",
+            //    "Confirm Close",
+            //    MessageBoxButton.YesNo,
+            //    MessageBoxImage.Question);
 
-            if (result == MessageBoxResult.No)
-            {
-                e.Cancel = true;
-                return;
-            }
+            //if (result == MessageBoxResult.No)
+            //{
+            //    e.Cancel = true;
+            //    return;
+            //}
 
             try
             {
-                LogManager.Instance.LogInfomation("Closing RecorderWindow - stopping all processes...");
                 this.IsEnabled = false;
                 _isClosing = true;
                 await CleanupAsync();
@@ -521,7 +520,6 @@ namespace WpfUI
                     return;
                 }
 
-                LogManager.Instance.LogInfomation("Stopping Client process...");
 
                 if (_clientCts != null)
                 {
@@ -595,7 +593,6 @@ namespace WpfUI
                     LogManager.Instance.LogWarning("⚠️ Server process already closed");
                     return;
                 }
-                LogManager.Instance.LogInfomation("Stopping Server process...");
 
                 if (_serverCts != null)
                 {
@@ -962,7 +959,6 @@ namespace WpfUI
         {
             try
             {
-                LogManager.Instance?.LogInfomation("🛑 Cleaning up RecorderWindow resources...");
 
                 // Unsubscribe from events FIRST
                 UnsubscribeFromDataSources();
@@ -1030,7 +1026,6 @@ namespace WpfUI
                     LogManager.Instance?.LogWarning($"ProcessManager dispose failed: {ex.Message}");
                 }
 
-                LogManager.Instance?.LogInfomation(" RecorderWindow cleanup completed");
             }
             catch (Exception ex)
             {

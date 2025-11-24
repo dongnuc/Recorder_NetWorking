@@ -8,7 +8,7 @@ using System.Windows;
 using System;
 using WpfUI.Properties;
 using System.Collections.Generic;
-using OfficeOpenXml; // (Dùng để sửa lỗi File Locking)
+using OfficeOpenXml; 
 using System.Threading.Tasks;
 
 namespace WpfUI.ViewModels
@@ -178,15 +178,11 @@ namespace WpfUI.ViewModels
                 string networkSourceFile = (protocol == "TCP") ? "NetworkTCP.xlsx" : "NetworkHTTP.xlsx";
                 string networkSourcePath = Path.Combine(_testCaseTemplateDir, networkSourceFile);
                 string detailDestPath = Path.Combine(testCasePath, "Detail.xlsx");
-                //string chosenEnvRunFile = useDatabase ? "EnvRunDB.xlsx" : "EnvRunNoDB.xlsx";
-                //string srcSheetPath = Path.Combine(_questionTemplateDir, chosenEnvRunFile);
-                //string destEnvPath = Path.Combine(questionPath, "Environment.xlsx");
                 if (File.Exists(networkSourcePath) && File.Exists(detailDestPath))
                 {
                     try
                     {
                         _folderHandler.ReplaceSheetExcel(networkSourcePath, detailDestPath, "Network");
-                        LogManager.Instance.LogInfomation($"Applied {networkSourceFile} (Protocol: {protocol}) to Detail.xlsx");
                     }
                     catch (Exception ex)
                     {
@@ -239,7 +235,6 @@ namespace WpfUI.ViewModels
                 {
                     string parentHeaderPath = Path.Combine(SelectedItem.FullPath, "Header.xlsx");
 
-                    LogManager.Instance.LogInfomation($"Appending '{testCaseName}' to Header file: {parentHeaderPath}...");
 
                     await _fileHandler.AppendNewRow(parentHeaderPath, "TestSuite", testCaseName, string.Empty);
 
@@ -290,7 +285,6 @@ namespace WpfUI.ViewModels
                         string parentHeaderPath = Path.Combine(parentPath, "Header.xlsx");
                         string testCaseName = SelectedItem.Name;
 
-                        LogManager.Instance.LogInfomation($"Deleting TestCase. Removing '{testCaseName}' from {parentHeaderPath}...");
 
                         try
                         {
