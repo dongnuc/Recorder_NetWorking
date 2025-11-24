@@ -21,7 +21,7 @@ namespace NetworkMonitor.Services
             if (args == null)
                 return new TcpNetworkFlow();
 
-            var timestamp = DateTime.Now.ToString(Logging_Keywords.TimestampFormat);
+            var timestamp = args.Timestamp.ToString(Logging_Keywords.TimestampFormat);
             var source = $"{args.SourceIp}:{args.SourcePort}";
             var destination = $"{args.DestinationIp}:{args.DestinationPort}";
             
@@ -54,7 +54,7 @@ namespace NetworkMonitor.Services
             if (args == null)
                 return new HttpNetworkFlow();
 
-            var timestamp = DateTime.Now.ToString(Logging_Keywords.TimestampFormat);
+            var timestamp = args.Timestamp.ToString(Logging_Keywords.TimestampFormat);
             var source = $"{args.SourceIp}:{args.SourcePort}";
             var destination = $"{args.DestinationIp}:{args.DestinationPort}";
 
