@@ -617,8 +617,8 @@ namespace NetworkMonitor.Services
             if (_monitoredPorts.Contains(destinationPort))
                 return destinationPort;
 
-            // No match found, return the first monitored port as fallback
-            return _monitoredPorts[0];
+            // No match found, but we have monitored ports - return first as fallback
+            return _monitoredPorts.Count > 0 ? _monitoredPorts[0] : null;
         }
     }
 }

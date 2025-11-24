@@ -13,6 +13,10 @@ namespace NetworkMonitor.Services
     /// </summary>
     public static class NetworkFlowConverter
     {
+        // Compiled regex patterns for better performance
+        private static readonly Regex HttpRequestRegex = new(@"^(\S+)\s+(\S+)\s+HTTP/([0-9.]+)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex HttpResponseRegex = new(@"^HTTP/([0-9.]+)\s+(\d+)\s*(.*)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
         /// <summary>
         /// Converts a packet to a TCP network flow object.
         /// </summary>
@@ -33,7 +37,8 @@ namespace NetworkMonitor.Services
 
             var flow = new TcpNetworkFlow
             {
-                Info = $"[{timestamp}] TCP {source} -> {destination}",
+                Time = timestamp,
+                Info = "TCP",  // Simple "TCP" for TCP-only packets
                 Source = source,
                 Destination = destination,
                 Flags = flags,
@@ -67,9 +72,25 @@ namespace NetworkMonitor.Services
             // Parse HTTP data
             var httpData = ParseHttpData(args.DecodedPayload);
 
+            // Determine if this is a request or response
+            string info;
+            if (!string.IsNullOrEmpty(httpData.Method))
+            {
+                info = "HTTP Request";
+            }
+            else if (!string.IsNullOrEmpty(httpData.Status))
+            {
+                info = "HTTP Response";
+            }
+            else
+            {
+                info = "HTTP";
+            }
+
             var flow = new HttpNetworkFlow
             {
-                Info = $"[{timestamp}] {httpData.RequestLine ?? httpData.StatusLine ?? "HTTP"} {source} -> {destination}",
+                Time = timestamp,
+                Info = info,
                 Source = source,
                 Destination = destination,
                 Flags = flags,
@@ -137,19 +158,21 @@ namespace NetworkMonitor.Services
                 return null;
 
             if (tcp.Synchronize && !tcp.Acknowledgment)
-                return "SYN_SENT";
+                return "Client connecting to server (SYN)";
             if (tcp.Synchronize && tcp.Acknowledgment)
-                return "SYN_ACK";
+                return "Server responding (SYN-ACK)";
             if (tcp.Finished && tcp.Acknowledgment)
-                return "FIN_ACK";
+                return "Closing connection (FIN-ACK)";
             if (tcp.Finished)
-                return "FIN_WAIT";
+                return "Initiating connection close (FIN)";
             if (tcp.Reset)
-                return "RESET";
+                return "Connection reset (RST)";
+            if (tcp.Push && tcp.Acknowledgment)
+                return "Data transfer in progress";
             if (tcp.Acknowledgment)
-                return "ESTABLISHED";
+                return "Connection established";
 
-            return "UNKNOWN";
+            return "Unknown state";
         }
 
         /// <summary>
@@ -230,7 +253,7 @@ namespace NetworkMonitor.Services
             var firstLine = lines[0];
             
             // Parse request line: METHOD URI HTTP/VERSION
-            var requestMatch = Regex.Match(firstLine, @"^(\S+)\s+(\S+)\s+HTTP/([0-9.]+)", RegexOptions.IgnoreCase);
+            var requestMatch = HttpRequestRegex.Match(firstLine);
             if (requestMatch.Success)
             {
                 httpData.Method = requestMatch.Groups[1].Value;
@@ -253,7 +276,7 @@ namespace NetworkMonitor.Services
             var firstLine = lines[0];
             
             // Parse status line: HTTP/VERSION STATUS_CODE STATUS_MESSAGE
-            var responseMatch = Regex.Match(firstLine, @"^HTTP/([0-9.]+)\s+(\d+)\s*(.*)", RegexOptions.IgnoreCase);
+            var responseMatch = HttpResponseRegex.Match(firstLine);
             if (responseMatch.Success)
             {
                 httpData.HttpVersion = $"HTTP/{responseMatch.Groups[1].Value}";
@@ -288,10 +311,14 @@ namespace NetworkMonitor.Services
 
                     headerLines.Add(line);
 
-                    // Extract Host header if present
+                    // Extract Host header if present (case-insensitive)
                     if (line.StartsWith("Host:", StringComparison.OrdinalIgnoreCase))
                     {
-                        httpData.Host = line.Substring(5).Trim();
+                        int colonIndex = line.IndexOf(':');
+                        if (colonIndex >= 0 && colonIndex < line.Length - 1)
+                        {
+                            httpData.Host = line.Substring(colonIndex + 1).Trim();
+                        }
                     }
                 }
                 else
@@ -302,7 +329,7 @@ namespace NetworkMonitor.Services
 
             if (headerLines.Count > 0)
             {
-                httpData.Headers = string.Join("\n", headerLines);
+                httpData.Headers = string.Join("; ", headerLines);
             }
 
             if (bodyLines.Count > 0)
