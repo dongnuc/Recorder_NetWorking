@@ -21,6 +21,10 @@ namespace NetworkMonitor.Services
         private List<int>? _monitoredPorts;
         private bool _monitorAllPorts;
         private bool _isCapturing;
+        private readonly List<PacketCapturedEventArgs> _capturedPackets = new();
+        private readonly object _packetsLock = new();
+        private const int MaxStoredPackets = 1000; // Limit to prevent memory issues
+        private bool _logCapturedPackets = false; // Enable/disable packet logging
 
         /// <summary>
         /// Event raised when a packet is captured.
@@ -31,6 +35,16 @@ namespace NetworkMonitor.Services
         /// Event raised when a log message needs to be written.
         /// </summary>
         public event EventHandler<LogMessageEventArgs>? LogMessage;
+
+        /// <summary>
+        /// Gets or sets whether to log captured packets via LogMessage event.
+        /// When enabled, each captured packet will be logged with its details including TCP flags.
+        /// </summary>
+        public bool LogCapturedPackets
+        {
+            get => _logCapturedPackets;
+            set => _logCapturedPackets = value;
+        }
 
         /// <summary>
         /// Starts capturing packets on the specified device.
@@ -277,8 +291,8 @@ namespace NetworkMonitor.Services
                 if (srcPort == 0 && dstPort == 0 && string.IsNullOrEmpty(decodedPayload))
                     return;
 
-                // Raise packet captured event
-                PacketCaptured?.Invoke(this, new PacketCapturedEventArgs
+                // Create packet captured event args
+                var eventArgs = new PacketCapturedEventArgs
                 {
                     SourceIp = srcIp,
                     SourcePort = srcPort,
@@ -288,7 +302,20 @@ namespace NetworkMonitor.Services
                     ProtocolLabel = protocolLabel,
                     Packet = packet,
                     TcpPacket = tcp
-                });
+                };
+
+                // Store captured packet for service retrieval
+                StorePacket(eventArgs);
+
+                // Log captured packet if logging is enabled
+                if (_logCapturedPackets)
+                {
+                    var packetSummary = PacketFormatter.FormatPacketSummary(eventArgs);
+                    RaiseLogMessage($"[Packet Captured] {packetSummary}", false);
+                }
+
+                // Raise packet captured event
+                PacketCaptured?.Invoke(this, eventArgs);
             }
             catch (Exception ex)
             {
@@ -358,6 +385,97 @@ namespace NetworkMonitor.Services
                 Message = message,
                 IsError = isError
             });
+        }
+
+        /// <summary>
+        /// Stores a captured packet in the internal buffer.
+        /// </summary>
+        private void StorePacket(PacketCapturedEventArgs eventArgs)
+        {
+            lock (_packetsLock)
+            {
+                _capturedPackets.Add(eventArgs);
+
+                // Limit stored packets to prevent memory issues
+                if (_capturedPackets.Count > MaxStoredPackets)
+                {
+                    _capturedPackets.RemoveAt(0); // Remove oldest packet
+                }
+            }
+        }
+
+        /// <summary>
+        /// Gets all captured packets as formatted strings.
+        /// </summary>
+        /// <param name="format">The format to use: "summary", "detailed", or "json". Default is "summary".</param>
+        /// <returns>List of formatted packet strings.</returns>
+        public List<string> GetCapturedPacketsAsStrings(string format = "summary")
+        {
+            lock (_packetsLock)
+            {
+                return FormatPackets(_capturedPackets, format);
+            }
+        }
+
+        /// <summary>
+        /// Gets the most recent captured packets as formatted strings.
+        /// </summary>
+        /// <param name="count">Number of recent packets to retrieve.</param>
+        /// <param name="format">The format to use: "summary", "detailed", or "json". Default is "summary".</param>
+        /// <returns>List of formatted packet strings.</returns>
+        public List<string> GetRecentPacketsAsStrings(int count, string format = "summary")
+        {
+            lock (_packetsLock)
+            {
+                var recentPackets = _capturedPackets
+                    .Skip(Math.Max(0, _capturedPackets.Count - count))
+                    .ToList();
+                return FormatPackets(recentPackets, format);
+            }
+        }
+
+        /// <summary>
+        /// Clears all stored captured packets.
+        /// </summary>
+        public void ClearCapturedPackets()
+        {
+            lock (_packetsLock)
+            {
+                _capturedPackets.Clear();
+            }
+        }
+
+        /// <summary>
+        /// Gets the count of captured packets currently stored.
+        /// </summary>
+        public int GetCapturedPacketCount()
+        {
+            lock (_packetsLock)
+            {
+                return _capturedPackets.Count;
+            }
+        }
+
+        /// <summary>
+        /// Formats a list of packets based on the specified format.
+        /// </summary>
+        private List<string> FormatPackets(List<PacketCapturedEventArgs> packets, string format)
+        {
+            var result = new List<string>();
+
+            foreach (var packet in packets)
+            {
+                string formattedPacket = format.ToLowerInvariant() switch
+                {
+                    "detailed" => PacketFormatter.FormatPacket(packet),
+                    "json" => PacketFormatter.FormatPacketAsJson(packet),
+                    _ => PacketFormatter.FormatPacketSummary(packet)
+                };
+
+                result.Add(formattedPacket);
+            }
+
+            return result;
         }
     }
 }
