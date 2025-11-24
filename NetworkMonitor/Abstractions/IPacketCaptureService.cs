@@ -22,6 +22,12 @@ namespace NetworkMonitor.Abstractions
         event EventHandler<LogMessageEventArgs>? LogMessage;
 
         /// <summary>
+        /// Gets or sets whether to log captured packets via LogMessage event.
+        /// When enabled, each captured packet will be logged with its details including TCP flags.
+        /// </summary>
+        bool LogCapturedPackets { get; set; }
+
+        /// <summary>
         /// Starts capturing packets on the specified device.
         /// </summary>
         /// <param name="device">The capture device to use.</param>
