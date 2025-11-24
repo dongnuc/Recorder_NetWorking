@@ -262,15 +262,19 @@ namespace Middleware.Services
             var destLabel = GetEndpointLabel(destPort);
 
             var info = isRequest 
-                ? $"TCP Data ({sourceLabel} -> {destLabel})" 
-                : $"TCP Data ({sourceLabel} -> {destLabel})";
+                ? $"TCP Data (Client -> Server)" 
+                : $"TCP Data (Server -> Client)";
+
+            // For requests, flags typically show data push from client
+            // For responses, flags show data push from server
+            var flags = isRequest ? "PSH, ACK" : "PSH, ACK";
 
             return new TcpCaptureData
             {
                 Info = info,
                 Source = $"{sourceAddress}:{sourcePort} ({sourceLabel})",
                 Destination = $"{destAddress}:{destPort} ({destLabel})",
-                Flags = "PSH, ACK",
+                Flags = flags,
                 State = direction,
                 Data = data
             };
@@ -388,7 +392,10 @@ namespace Middleware.Services
                         {
                             forwardRequest.Headers.TryAddWithoutValidation(headerName, request.Headers[headerName]);
                         }
-                        catch { }
+                        catch (Exception ex)
+                        {
+                            LogManager.Instance.LogDebug($"Failed to add header '{headerName}': {ex.Message}");
+                        }
                     }
                 }
 
