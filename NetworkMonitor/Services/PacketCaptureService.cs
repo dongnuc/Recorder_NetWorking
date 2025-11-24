@@ -313,15 +313,7 @@ namespace NetworkMonitor.Services
                 {
                     // Output as structured network flow object
                     var monitoredPort = GetMonitoredPort();
-                    object flow;
-                    if (eventArgs.ProtocolLabel == Network_Keywords.ProtocolHTTP)
-                    {
-                        flow = NetworkFlowConverter.ToHttpNetworkFlow(eventArgs, monitoredPort);
-                    }
-                    else
-                    {
-                        flow = NetworkFlowConverter.ToTcpNetworkFlow(eventArgs, monitoredPort);
-                    }
+                    object flow = ConvertPacketToNetworkFlow(eventArgs, monitoredPort);
                     var flowJson = NetworkFlowConverter.ToJson(flow);
                     RaiseLogMessage($"[Network Flow Captured]\n{flowJson}", false);
                 }
@@ -556,14 +548,7 @@ namespace NetworkMonitor.Services
 
             foreach (var packet in packets)
             {
-                if (packet.ProtocolLabel == Network_Keywords.ProtocolHTTP)
-                {
-                    result.Add(NetworkFlowConverter.ToHttpNetworkFlow(packet, monitoredPort));
-                }
-                else
-                {
-                    result.Add(NetworkFlowConverter.ToTcpNetworkFlow(packet, monitoredPort));
-                }
+                result.Add(ConvertPacketToNetworkFlow(packet, monitoredPort));
             }
 
             return result;
@@ -579,19 +564,26 @@ namespace NetworkMonitor.Services
 
             foreach (var packet in packets)
             {
-                object flow;
-                if (packet.ProtocolLabel == Network_Keywords.ProtocolHTTP)
-                {
-                    flow = NetworkFlowConverter.ToHttpNetworkFlow(packet, monitoredPort);
-                }
-                else
-                {
-                    flow = NetworkFlowConverter.ToTcpNetworkFlow(packet, monitoredPort);
-                }
+                object flow = ConvertPacketToNetworkFlow(packet, monitoredPort);
                 result.Add(NetworkFlowConverter.ToJson(flow));
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// Converts a single packet to the appropriate network flow object (TCP or HTTP).
+        /// </summary>
+        private object ConvertPacketToNetworkFlow(PacketCapturedEventArgs packet, int? monitoredPort)
+        {
+            if (packet.ProtocolLabel == Network_Keywords.ProtocolHTTP)
+            {
+                return NetworkFlowConverter.ToHttpNetworkFlow(packet, monitoredPort);
+            }
+            else
+            {
+                return NetworkFlowConverter.ToTcpNetworkFlow(packet, monitoredPort);
+            }
         }
 
         /// <summary>

@@ -26,22 +26,10 @@ namespace NetworkMonitor.Services
             var destination = $"{args.DestinationIp}:{args.DestinationPort}";
             
             // Determine roles based on monitored port
-            string? sourceRole = null;
-            string? destinationRole = null;
-            if (monitoredPort.HasValue)
-            {
-                sourceRole = args.SourcePort == monitoredPort.Value ? "Server" : "Client";
-                destinationRole = args.DestinationPort == monitoredPort.Value ? "Server" : "Client";
-            }
+            var (sourceRole, destinationRole) = DetermineRoles(args.SourcePort, args.DestinationPort, monitoredPort);
 
-            // Get TCP flags
-            string? flags = null;
-            string? state = null;
-            if (args.TcpPacket != null)
-            {
-                flags = GetTcpFlags(args.TcpPacket);
-                state = DetermineConnectionState(args.TcpPacket);
-            }
+            // Get TCP flags and state
+            var (flags, state) = GetTcpFlagsAndState(args.TcpPacket);
 
             var flow = new TcpNetworkFlow
             {
@@ -71,22 +59,10 @@ namespace NetworkMonitor.Services
             var destination = $"{args.DestinationIp}:{args.DestinationPort}";
 
             // Determine roles based on monitored port
-            string? sourceRole = null;
-            string? destinationRole = null;
-            if (monitoredPort.HasValue)
-            {
-                sourceRole = args.SourcePort == monitoredPort.Value ? "Server" : "Client";
-                destinationRole = args.DestinationPort == monitoredPort.Value ? "Server" : "Client";
-            }
+            var (sourceRole, destinationRole) = DetermineRoles(args.SourcePort, args.DestinationPort, monitoredPort);
 
-            // Get TCP flags
-            string? flags = null;
-            string? state = null;
-            if (args.TcpPacket != null)
-            {
-                flags = GetTcpFlags(args.TcpPacket);
-                state = DetermineConnectionState(args.TcpPacket);
-            }
+            // Get TCP flags and state
+            var (flags, state) = GetTcpFlagsAndState(args.TcpPacket);
 
             // Parse HTTP data
             var httpData = ParseHttpData(args.DecodedPayload);
@@ -173,6 +149,32 @@ namespace NetworkMonitor.Services
                 return "ESTABLISHED";
 
             return "UNKNOWN";
+        }
+
+        /// <summary>
+        /// Determines server/client roles based on port and monitored port.
+        /// </summary>
+        private static (string?, string?) DetermineRoles(int sourcePort, int destinationPort, int? monitoredPort)
+        {
+            if (!monitoredPort.HasValue)
+                return (null, null);
+
+            string sourceRole = sourcePort == monitoredPort.Value ? "Server" : "Client";
+            string destinationRole = destinationPort == monitoredPort.Value ? "Server" : "Client";
+            return (sourceRole, destinationRole);
+        }
+
+        /// <summary>
+        /// Gets TCP flags and connection state from a TCP packet.
+        /// </summary>
+        private static (string?, string?) GetTcpFlagsAndState(TcpPacket? tcp)
+        {
+            if (tcp == null)
+                return (null, null);
+
+            string? flags = GetTcpFlags(tcp);
+            string? state = DetermineConnectionState(tcp);
+            return (flags, state);
         }
 
         /// <summary>
