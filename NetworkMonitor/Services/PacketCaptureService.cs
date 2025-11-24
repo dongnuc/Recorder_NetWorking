@@ -24,6 +24,7 @@ namespace NetworkMonitor.Services
         private readonly List<PacketCapturedEventArgs> _capturedPackets = new();
         private readonly object _packetsLock = new();
         private const int MaxStoredPackets = 1000; // Limit to prevent memory issues
+        private bool _logCapturedPackets = false; // Enable/disable packet logging
 
         /// <summary>
         /// Event raised when a packet is captured.
@@ -34,6 +35,16 @@ namespace NetworkMonitor.Services
         /// Event raised when a log message needs to be written.
         /// </summary>
         public event EventHandler<LogMessageEventArgs>? LogMessage;
+
+        /// <summary>
+        /// Gets or sets whether to log captured packets via LogMessage event.
+        /// When enabled, each captured packet will be logged with its details including TCP flags.
+        /// </summary>
+        public bool LogCapturedPackets
+        {
+            get => _logCapturedPackets;
+            set => _logCapturedPackets = value;
+        }
 
         /// <summary>
         /// Starts capturing packets on the specified device.
@@ -295,6 +306,13 @@ namespace NetworkMonitor.Services
 
                 // Store captured packet for service retrieval
                 StorePacket(eventArgs);
+
+                // Log captured packet if logging is enabled
+                if (_logCapturedPackets)
+                {
+                    var packetSummary = PacketFormatter.FormatPacketSummary(eventArgs);
+                    RaiseLogMessage($"[Packet Captured] {packetSummary}", false);
+                }
 
                 // Raise packet captured event
                 PacketCaptured?.Invoke(this, eventArgs);

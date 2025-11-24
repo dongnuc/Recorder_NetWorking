@@ -10,6 +10,8 @@ A C# library for capturing and analyzing network packets using SharpPcap.
 - Multiple output formats: summary, detailed, JSON
 - Configurable port filtering
 - HTTP protocol detection
+- **TCP flags logging and capture** (including SYN, ACK, FIN, RST, PSH, URG, ECE, CWR)
+- Optional automatic packet logging via LogMessage event
 
 ## Usage
 
@@ -21,6 +23,9 @@ using NetworkMonitor.Abstractions;
 using SharpPcap;
 
 var service = new PacketCaptureService();
+
+// Enable automatic logging of captured packets with TCP flags
+service.LogCapturedPackets = true;
 
 // Subscribe to events
 service.PacketCaptured += (sender, args) =>
@@ -53,6 +58,15 @@ using NetworkMonitor.Abstractions;
 using SharpPcap;
 
 var service = new PacketCaptureService();
+
+// Enable automatic logging to see TCP flags in logs
+service.LogCapturedPackets = true;
+
+service.LogMessage += (sender, args) =>
+{
+    Console.WriteLine($"[{(args.IsError ? "ERROR" : "INFO")}] {args.Message}");
+};
+
 var devices = CaptureDeviceList.Instance;
 
 if (devices.Count > 0)
@@ -66,7 +80,7 @@ if (devices.Count > 0)
     // Wait for some packets to be captured
     await Task.Delay(5000);
     
-    // Retrieve captured packets as strings
+    // Retrieve captured packets as strings (includes TCP flags)
     var packets = service.GetCapturedPacketsAsStrings("summary");
     foreach (var packet in packets)
     {
@@ -94,6 +108,33 @@ if (devices.Count > 0)
     service.StopCapture();
 }
 ```
+
+## TCP Flags Logging
+
+TCP flags are automatically captured and included in all packet formats:
+
+```csharp
+var service = new PacketCaptureService();
+
+// Enable logging to see TCP flags in real-time via LogMessage event
+service.LogCapturedPackets = true;
+
+service.LogMessage += (sender, args) =>
+{
+    // Will log packets like: "[Packet Captured] TCP [SYN, ACK]: 192.168.1.100:54321 -> 192.168.1.1:443"
+    Console.WriteLine(args.Message);
+};
+```
+
+Supported TCP flags:
+- **FIN** - Finish
+- **SYN** - Synchronize
+- **RST** - Reset
+- **PSH** - Push
+- **ACK** - Acknowledgment
+- **URG** - Urgent
+- **ECE** - ECN-Echo (bit 8, RFC 3168)
+- **CWR** - Congestion Window Reduced (bit 9, RFC 3168)
 
 ## Output Formats
 

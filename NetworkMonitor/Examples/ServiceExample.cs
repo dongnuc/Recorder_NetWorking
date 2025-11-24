@@ -11,13 +11,16 @@ namespace NetworkMonitor.Examples
     {
         /// <summary>
         /// Demonstrates how to use PacketCaptureService in a service context
-        /// to retrieve network data as formatted strings.
+        /// to retrieve network data as formatted strings with TCP flags.
         /// </summary>
         public static async Task RunExample()
         {
             var service = new PacketCaptureService();
             
-            // Optional: Subscribe to log messages
+            // Enable automatic logging of captured packets (includes TCP flags)
+            service.LogCapturedPackets = true;
+            
+            // Subscribe to log messages to see TCP flags in real-time
             service.LogMessage += (sender, args) =>
             {
                 Console.WriteLine($"[{(args.IsError ? "ERROR" : "INFO")}] {args.Message}");
@@ -46,6 +49,7 @@ namespace NetworkMonitor.Examples
                 var captureTask = service.StartCaptureAsync(device, "common", null, cts.Token);
                 
                 Console.WriteLine("Capturing packets for 10 seconds...");
+                Console.WriteLine("TCP flags will be logged in real-time...\n");
                 await Task.Delay(10000);
 
                 // Retrieve all captured packets as summary strings
