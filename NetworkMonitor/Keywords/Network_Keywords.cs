@@ -1,6 +1,6 @@
 ﻿using System.Text.RegularExpressions;
 
-namespace NetworkMonitor
+namespace NetworkMonitor.Keywords
 {
     /// <summary>
     /// Contains all network-related string constants used throughout the application.
