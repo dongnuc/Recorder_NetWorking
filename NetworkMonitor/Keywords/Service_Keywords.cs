@@ -1,4 +1,4 @@
-﻿namespace NetworkMonitor
+﻿namespace NetworkMonitor.Keywords
 {
     /// <summary>
     /// Contains all service-related string constants used throughout the application.
