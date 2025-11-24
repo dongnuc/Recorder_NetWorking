@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using NetworkMonitor.Abstractions;
 using NetworkMonitor.Keywords;
+using NetworkMonitor.Models;
 
 namespace NetworkMonitor.Services
 {
@@ -310,8 +311,19 @@ namespace NetworkMonitor.Services
                 // Log captured packet if logging is enabled
                 if (_logCapturedPackets)
                 {
-                    var packetSummary = PacketFormatter.FormatPacketSummary(eventArgs);
-                    RaiseLogMessage($"[Packet Captured] {packetSummary}", false);
+                    // Output as structured network flow object
+                    var monitoredPort = GetMonitoredPort();
+                    object flow;
+                    if (eventArgs.ProtocolLabel == Network_Keywords.ProtocolHTTP)
+                    {
+                        flow = NetworkFlowConverter.ToHttpNetworkFlow(eventArgs, monitoredPort);
+                    }
+                    else
+                    {
+                        flow = NetworkFlowConverter.ToTcpNetworkFlow(eventArgs, monitoredPort);
+                    }
+                    var flowJson = NetworkFlowConverter.ToJson(flow);
+                    RaiseLogMessage($"[Network Flow Captured]\n{flowJson}", false);
                 }
 
                 // Raise packet captured event
@@ -476,6 +488,121 @@ namespace NetworkMonitor.Services
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// Gets all captured packets as structured network flow objects.
+        /// </summary>
+        /// <returns>List of network flow objects (TcpNetworkFlow or HttpNetworkFlow).</returns>
+        public List<object> GetCapturedNetworkFlows()
+        {
+            lock (_packetsLock)
+            {
+                return ConvertToNetworkFlows(_capturedPackets);
+            }
+        }
+
+        /// <summary>
+        /// Gets the most recent captured packets as structured network flow objects.
+        /// </summary>
+        /// <param name="count">Number of recent packets to retrieve.</param>
+        /// <returns>List of network flow objects.</returns>
+        public List<object> GetRecentNetworkFlows(int count)
+        {
+            lock (_packetsLock)
+            {
+                var recentPackets = _capturedPackets
+                    .Skip(Math.Max(0, _capturedPackets.Count - count))
+                    .ToList();
+                return ConvertToNetworkFlows(recentPackets);
+            }
+        }
+
+        /// <summary>
+        /// Gets all captured packets as JSON strings representing structured network flows.
+        /// </summary>
+        /// <returns>List of JSON strings.</returns>
+        public List<string> GetCapturedNetworkFlowsAsJson()
+        {
+            lock (_packetsLock)
+            {
+                return ConvertToNetworkFlowsJson(_capturedPackets);
+            }
+        }
+
+        /// <summary>
+        /// Gets the most recent captured packets as JSON strings representing structured network flows.
+        /// </summary>
+        /// <param name="count">Number of recent packets to retrieve.</param>
+        /// <returns>List of JSON strings.</returns>
+        public List<string> GetRecentNetworkFlowsAsJson(int count)
+        {
+            lock (_packetsLock)
+            {
+                var recentPackets = _capturedPackets
+                    .Skip(Math.Max(0, _capturedPackets.Count - count))
+                    .ToList();
+                return ConvertToNetworkFlowsJson(recentPackets);
+            }
+        }
+
+        /// <summary>
+        /// Converts a list of packet event args to network flow objects.
+        /// </summary>
+        private List<object> ConvertToNetworkFlows(List<PacketCapturedEventArgs> packets)
+        {
+            var result = new List<object>();
+            var monitoredPort = GetMonitoredPort();
+
+            foreach (var packet in packets)
+            {
+                if (packet.ProtocolLabel == Network_Keywords.ProtocolHTTP)
+                {
+                    result.Add(NetworkFlowConverter.ToHttpNetworkFlow(packet, monitoredPort));
+                }
+                else
+                {
+                    result.Add(NetworkFlowConverter.ToTcpNetworkFlow(packet, monitoredPort));
+                }
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Converts a list of packet event args to network flow JSON strings.
+        /// </summary>
+        private List<string> ConvertToNetworkFlowsJson(List<PacketCapturedEventArgs> packets)
+        {
+            var result = new List<string>();
+            var monitoredPort = GetMonitoredPort();
+
+            foreach (var packet in packets)
+            {
+                object flow;
+                if (packet.ProtocolLabel == Network_Keywords.ProtocolHTTP)
+                {
+                    flow = NetworkFlowConverter.ToHttpNetworkFlow(packet, monitoredPort);
+                }
+                else
+                {
+                    flow = NetworkFlowConverter.ToTcpNetworkFlow(packet, monitoredPort);
+                }
+                result.Add(NetworkFlowConverter.ToJson(flow));
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Gets the first monitored port if available, or null if monitoring all ports.
+        /// </summary>
+        private int? GetMonitoredPort()
+        {
+            if (_monitorAllPorts || _monitoredPorts == null || _monitoredPorts.Count == 0)
+                return null;
+
+            return _monitoredPorts[0];
         }
     }
 }
