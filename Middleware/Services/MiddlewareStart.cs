@@ -3,6 +3,8 @@ using Common.Logging;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Text.Json;
+using Common.Models.Entities;
 using static Common.Models.Entities.MiddlewareModel;
 
 namespace Middleware.Services
@@ -135,6 +137,168 @@ namespace Middleware.Services
 
         #endregion
 
+        #region Helper Methods for Structured Output
+
+        /// <summary>
+        /// Determines if a port belongs to the server
+        /// </summary>
+        private bool IsServerPort(int port)
+        {
+            return port == _serverPort;
+        }
+
+        /// <summary>
+        /// Gets the endpoint label (Client or Server) based on port
+        /// </summary>
+        private string GetEndpointLabel(int port)
+        {
+            return IsServerPort(port) ? "Server" : "Client";
+        }
+
+        /// <summary>
+        /// Creates structured HTTP request capture data
+        /// </summary>
+        private HttpCaptureData CreateHttpRequestCapture(HttpListenerContext context, string requestBody)
+        {
+            var request = context.Request;
+            var clientEndpoint = request.RemoteEndPoint;
+            var localEndpoint = request.LocalEndPoint;
+
+            // Build HTTP headers string
+            var headersBuilder = new StringBuilder();
+            foreach (string headerName in request.Headers.AllKeys)
+            {
+                headersBuilder.AppendLine($"{headerName}: {request.Headers[headerName]}");
+            }
+
+            // Extract HTTP version
+            var httpVersion = $"HTTP/{request.ProtocolVersion}";
+
+            // Build info string
+            var info = $"HTTP Request ({request.HttpMethod} {request.Url?.PathAndQuery} {httpVersion})";
+
+            // Determine source and destination with port-based labels
+            var sourcePort = clientEndpoint?.Port ?? 0;
+            var destPort = localEndpoint?.Port ?? _proxyPort;
+            var source = $"{clientEndpoint?.Address}:{sourcePort} ({GetEndpointLabel(sourcePort)})";
+            var destination = $"{localEndpoint?.Address}:{destPort} (Proxy -> Server:{_serverPort})";
+
+            return new HttpCaptureData
+            {
+                Info = info,
+                Source = source,
+                Destination = destination,
+                Flags = request.HttpMethod,
+                State = "REQUEST",
+                URI = request.Url?.PathAndQuery,
+                Host = request.Headers["Host"] ?? request.Url?.Host,
+                Method = request.HttpMethod,
+                Status = null, // Not applicable for requests
+                HttpVersion = httpVersion,
+                HttpHeaders = headersBuilder.ToString().TrimEnd(),
+                HttpBody = requestBody
+            };
+        }
+
+        /// <summary>
+        /// Creates structured HTTP response capture data
+        /// </summary>
+        private HttpCaptureData CreateHttpResponseCapture(HttpListenerContext context, System.Net.Http.HttpResponseMessage responseMessage, string responseBody)
+        {
+            var request = context.Request;
+            var clientEndpoint = request.RemoteEndPoint;
+            var localEndpoint = request.LocalEndPoint;
+
+            // Build HTTP headers string
+            var headersBuilder = new StringBuilder();
+            foreach (var header in responseMessage.Headers)
+            {
+                headersBuilder.AppendLine($"{header.Key}: {string.Join(", ", header.Value)}");
+            }
+            foreach (var header in responseMessage.Content.Headers)
+            {
+                headersBuilder.AppendLine($"{header.Key}: {string.Join(", ", header.Value)}");
+            }
+
+            // Extract HTTP version
+            var httpVersion = $"HTTP/{responseMessage.Version}";
+
+            // Build status string
+            var status = $"{(int)responseMessage.StatusCode} {responseMessage.ReasonPhrase}";
+
+            // Build info string
+            var info = $"HTTP Response ({httpVersion} {status})";
+
+            // Determine source and destination with port-based labels
+            var sourcePort = _serverPort;
+            var destPort = clientEndpoint?.Port ?? 0;
+            var source = $"{localEndpoint?.Address}:{_proxyPort} (Proxy <- Server:{sourcePort})";
+            var destination = $"{clientEndpoint?.Address}:{destPort} ({GetEndpointLabel(destPort)})";
+
+            return new HttpCaptureData
+            {
+                Info = info,
+                Source = source,
+                Destination = destination,
+                Flags = status,
+                State = "RESPONSE",
+                URI = request.Url?.PathAndQuery,
+                Host = request.Headers["Host"] ?? request.Url?.Host,
+                Method = request.HttpMethod,
+                Status = status,
+                HttpVersion = httpVersion,
+                HttpHeaders = headersBuilder.ToString().TrimEnd(),
+                HttpBody = responseBody
+            };
+        }
+
+        /// <summary>
+        /// Creates structured TCP capture data
+        /// </summary>
+        private TcpCaptureData CreateTcpCapture(string sourceAddress, int sourcePort, string destAddress, int destPort, string data, bool isRequest)
+        {
+            var direction = isRequest ? "REQUEST" : "RESPONSE";
+            var sourceLabel = GetEndpointLabel(sourcePort);
+            var destLabel = GetEndpointLabel(destPort);
+
+            var info = isRequest 
+                ? $"TCP Data ({sourceLabel} -> {destLabel})" 
+                : $"TCP Data ({sourceLabel} -> {destLabel})";
+
+            return new TcpCaptureData
+            {
+                Info = info,
+                Source = $"{sourceAddress}:{sourcePort} ({sourceLabel})",
+                Destination = $"{destAddress}:{destPort} ({destLabel})",
+                Flags = "PSH, ACK",
+                State = direction,
+                Data = data
+            };
+        }
+
+        /// <summary>
+        /// Logs the complete structured object as JSON
+        /// </summary>
+        private void LogStructuredCapture(object captureData, string captureType)
+        {
+            try
+            {
+                var options = new JsonSerializerOptions
+                {
+                    WriteIndented = true,
+                    PropertyNamingPolicy = null // Keep property names as-is
+                };
+                var json = JsonSerializer.Serialize(captureData, options);
+                LogManager.Instance.LogInfomation($"\n[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {captureType} Capture:\n{json}\n{new string('-', 80)}");
+            }
+            catch (Exception ex)
+            {
+                LogManager.Instance.LogError($"Failed to serialize capture data: {ex.Message}");
+            }
+        }
+
+        #endregion
+
         #region HTTP Proxy
         private void StartHttpProxy(CancellationToken token)
         {
@@ -199,19 +363,40 @@ namespace Middleware.Services
                     ByteSize = requestBytes.Length.ToString()
                 };
 
+                // Create and log structured HTTP request capture
+                var httpRequestCapture = CreateHttpRequestCapture(context, requestBody);
+                LogStructuredCapture(httpRequestCapture, "HTTP REQUEST");
+
                 LogManager.Instance.LogDebug($" HTTP Request: {request.HttpMethod} {request.Url}");
 
                 // 2. Forward to real server
-                var realServerUrl = $"http://localhost:{_serverPort}{request.Url?.AbsolutePath}";
+                var realServerUrl = $"http://localhost:{_serverPort}{request.Url?.AbsolutePath}{request.Url?.Query}";
                 using var client = new HttpClient();
                 var forwardRequest = new HttpRequestMessage(new HttpMethod(request.HttpMethod), realServerUrl);
 
+                // Copy headers
+                foreach (string headerName in request.Headers.AllKeys)
+                {
+                    if (headerName.Equals("Host", StringComparison.OrdinalIgnoreCase))
+                    {
+                        forwardRequest.Headers.Host = $"localhost:{_serverPort}";
+                    }
+                    else if (!headerName.Equals("Content-Type", StringComparison.OrdinalIgnoreCase) &&
+                             !headerName.Equals("Content-Length", StringComparison.OrdinalIgnoreCase))
+                    {
+                        try
+                        {
+                            forwardRequest.Headers.TryAddWithoutValidation(headerName, request.Headers[headerName]);
+                        }
+                        catch { }
+                    }
+                }
+
                 if (!string.IsNullOrEmpty(requestBody))
                 {
-                    var contentType = request.ContentType != null
-                        ? System.Net.Http.Headers.MediaTypeHeaderValue.Parse(request.ContentType)
-                        : null;
-                    forwardRequest.Content = new StringContent(requestBody, contentType);
+                    forwardRequest.Content = new StringContent(requestBody, 
+                        request.ContentEncoding ?? Encoding.UTF8,
+                        request.ContentType ?? "application/json");
                 }
 
                 var responseMessage = await client.SendAsync(forwardRequest);
@@ -226,6 +411,10 @@ namespace Middleware.Services
                     DataType = DataInspector.DetecDataType(responseBytes),
                     ByteSize = responseBytes.Length.ToString()
                 };
+
+                // Create and log structured HTTP response capture
+                var httpResponseCapture = CreateHttpResponseCapture(context, responseMessage, responseBody);
+                LogStructuredCapture(httpResponseCapture, "HTTP RESPONSE");
 
                 LogManager.Instance.LogDebug($" HTTP Response: {responseMessage.StatusCode}");
 
@@ -354,12 +543,19 @@ namespace Middleware.Services
                     using var relayCts = CancellationTokenSource.CreateLinkedTokenSource(token);
 
                     //  Start Client → Server relay task
+                    var clientEndpoint = ((IPEndPoint)client.Client.RemoteEndPoint);
+                    var serverEndpoint = ((IPEndPoint)server.Client.RemoteEndPoint);
+                    
                     var c2s = RelayTcpDataAsync(
                         clientStream,
                         serverStream,
                         transaction.Request,
                         relayCts.Token,
                         isRequest: true,
+                        sourceAddress: clientEndpoint.Address.ToString(),
+                        sourcePort: clientEndpoint.Port,
+                        destAddress: "localhost",
+                        destPort: _serverPort,
                         onStreamClosed: () =>
                         {
                             LogManager.Instance.LogDebug("📭 Client closed connection");
@@ -374,6 +570,10 @@ namespace Middleware.Services
                         transaction.Response,
                         relayCts.Token,
                         isRequest: false,
+                        sourceAddress: serverEndpoint.Address.ToString(),
+                        sourcePort: _serverPort,
+                        destAddress: clientEndpoint.Address.ToString(),
+                        destPort: clientEndpoint.Port,
                         onStreamClosed: () =>
                         {
                             LogManager.Instance.LogDebug("📭 Server closed connection");
@@ -446,6 +646,10 @@ namespace Middleware.Services
             object dataTarget,
             CancellationToken token,
             bool isRequest,
+            string sourceAddress,
+            int sourcePort,
+            string destAddress,
+            int destPort,
             Action onStreamClosed = null)
         {
             var buffer = new byte[8192];
@@ -472,6 +676,10 @@ namespace Middleware.Services
                     // Capture data for logging
                     var data = Encoding.UTF8.GetString(buffer, 0, read);
                     var dataType = DataInspector.DetecDataType(buffer.Take(read).ToArray());
+
+                    // Create and log structured TCP capture
+                    var tcpCapture = CreateTcpCapture(sourceAddress, sourcePort, destAddress, destPort, data, isRequest);
+                    LogStructuredCapture(tcpCapture, isRequest ? "TCP REQUEST" : "TCP RESPONSE");
 
                     if (dataTarget is NetworkRequest request)
                     {
