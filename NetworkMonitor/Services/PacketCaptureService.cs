@@ -302,7 +302,8 @@ namespace NetworkMonitor.Services
                     DecodedPayload = decodedPayload,
                     ProtocolLabel = protocolLabel,
                     Packet = packet,
-                    TcpPacket = tcp
+                    TcpPacket = tcp,
+                    Timestamp = raw.Timeval.Date
                 };
 
                 // Store captured packet for service retrieval
