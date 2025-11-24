@@ -312,7 +312,7 @@ namespace NetworkMonitor.Services
                 if (_logCapturedPackets)
                 {
                     // Output as structured network flow object
-                    var monitoredPort = GetMonitoredPort();
+                    var monitoredPort = GetMatchingMonitoredPort(eventArgs.SourcePort, eventArgs.DestinationPort);
                     object flow = ConvertPacketToNetworkFlow(eventArgs, monitoredPort);
                     var flowJson = NetworkFlowConverter.ToJson(flow);
                     RaiseLogMessage($"[Network Flow Captured]\n{flowJson}", false);
@@ -544,10 +544,10 @@ namespace NetworkMonitor.Services
         private List<object> ConvertToNetworkFlows(List<PacketCapturedEventArgs> packets)
         {
             var result = new List<object>();
-            var monitoredPort = GetMonitoredPort();
 
             foreach (var packet in packets)
             {
+                var monitoredPort = GetMatchingMonitoredPort(packet.SourcePort, packet.DestinationPort);
                 result.Add(ConvertPacketToNetworkFlow(packet, monitoredPort));
             }
 
@@ -560,10 +560,10 @@ namespace NetworkMonitor.Services
         private List<string> ConvertToNetworkFlowsJson(List<PacketCapturedEventArgs> packets)
         {
             var result = new List<string>();
-            var monitoredPort = GetMonitoredPort();
 
             foreach (var packet in packets)
             {
+                var monitoredPort = GetMatchingMonitoredPort(packet.SourcePort, packet.DestinationPort);
                 object flow = ConvertPacketToNetworkFlow(packet, monitoredPort);
                 result.Add(NetworkFlowConverter.ToJson(flow));
             }
@@ -594,6 +594,29 @@ namespace NetworkMonitor.Services
             if (_monitorAllPorts || _monitoredPorts == null || _monitoredPorts.Count == 0)
                 return null;
 
+            // Return the first monitored port for simplicity
+            // This will be used by helper methods that need a port reference
+            return _monitoredPorts[0];
+        }
+
+        /// <summary>
+        /// Gets the monitored port that matches either the source or destination port.
+        /// Returns null if no monitored port matches.
+        /// </summary>
+        private int? GetMatchingMonitoredPort(int sourcePort, int destinationPort)
+        {
+            if (_monitorAllPorts || _monitoredPorts == null || _monitoredPorts.Count == 0)
+                return null;
+
+            // Check if source port is a monitored port
+            if (_monitoredPorts.Contains(sourcePort))
+                return sourcePort;
+
+            // Check if destination port is a monitored port
+            if (_monitoredPorts.Contains(destinationPort))
+                return destinationPort;
+
+            // No match found, return the first monitored port as fallback
             return _monitoredPorts[0];
         }
     }

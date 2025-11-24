@@ -120,9 +120,10 @@ namespace NetworkMonitor.Services
             if (tcp.Urgent) flags.Add(Network_Keywords.TcpFlagURG);
 
             // Check ECE and CWR flags using raw flags value
+            // According to RFC 3168: ECE is bit 6 (0x40) and CWR is bit 7 (0x80)
             ushort flagsValue = tcp.Flags;
-            if ((flagsValue & 0x100) != 0) flags.Add(Network_Keywords.TcpFlagECE);
-            if ((flagsValue & 0x200) != 0) flags.Add(Network_Keywords.TcpFlagCWR);
+            if ((flagsValue & 0x40) != 0) flags.Add(Network_Keywords.TcpFlagECE); // ECE - Bit 6
+            if ((flagsValue & 0x80) != 0) flags.Add(Network_Keywords.TcpFlagCWR); // CWR - Bit 7
 
             return flags.Count > 0 ? string.Join(", ", flags) : string.Empty;
         }
