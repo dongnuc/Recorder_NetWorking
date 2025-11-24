@@ -8,27 +8,27 @@ namespace Common.Models.Entities
         /// <summary>
         /// Information about the capture (e.g., "HTTP Request (POST /books HTTP/1.1)")
         /// </summary>
-        public string Info { get; set; }
+        public string Info { get; set; } = string.Empty;
 
         /// <summary>
         /// Source address and port (e.g., "::1:52387" or "Client")
         /// </summary>
-        public string Source { get; set; }
+        public string Source { get; set; } = string.Empty;
 
         /// <summary>
         /// Destination address and port (e.g., "::1:5000" or "Server")
         /// </summary>
-        public string Destination { get; set; }
+        public string Destination { get; set; } = string.Empty;
 
         /// <summary>
         /// TCP flags or HTTP status indicator
         /// </summary>
-        public string Flags { get; set; }
+        public string? Flags { get; set; }
 
         /// <summary>
         /// Connection state
         /// </summary>
-        public string State { get; set; }
+        public string? State { get; set; }
     }
 
     /// <summary>
@@ -39,7 +39,7 @@ namespace Common.Models.Entities
         /// <summary>
         /// TCP payload data
         /// </summary>
-        public string Data { get; set; }
+        public string? Data { get; set; }
     }
 
     /// <summary>
@@ -50,36 +50,36 @@ namespace Common.Models.Entities
         /// <summary>
         /// Request URI (e.g., "/books")
         /// </summary>
-        public string URI { get; set; }
+        public string? URI { get; set; }
 
         /// <summary>
         /// Host header value (e.g., "localhost:5000")
         /// </summary>
-        public string Host { get; set; }
+        public string? Host { get; set; }
 
         /// <summary>
         /// HTTP method (e.g., "POST", "GET")
         /// </summary>
-        public string Method { get; set; }
+        public string? Method { get; set; }
 
         /// <summary>
         /// HTTP status code (e.g., "201 Created")
         /// </summary>
-        public string Status { get; set; }
+        public string? Status { get; set; }
 
         /// <summary>
         /// HTTP protocol version (e.g., "HTTP/1.1")
         /// </summary>
-        public string HttpVersion { get; set; }
+        public string? HttpVersion { get; set; }
 
         /// <summary>
         /// HTTP headers as formatted string
         /// </summary>
-        public string HttpHeaders { get; set; }
+        public string? HttpHeaders { get; set; }
 
         /// <summary>
         /// HTTP body/payload
         /// </summary>
-        public string HttpBody { get; set; }
+        public string? HttpBody { get; set; }
     }
 }
