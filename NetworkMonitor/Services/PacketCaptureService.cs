@@ -1,15 +1,10 @@
-﻿using NetworkMonitor;
-using PacketDotNet;
-using SharpPcap;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
+﻿﻿using Common.Interfaces.Services;
 using NetworkMonitor.Abstractions;
 using NetworkMonitor.Keywords;
 using NetworkMonitor.Models;
+using PacketDotNet;
+using SharpPcap;
+using System.Text;
 
 namespace NetworkMonitor.Services
 {
@@ -26,11 +21,13 @@ namespace NetworkMonitor.Services
         private readonly object _packetsLock = new();
         private const int MaxStoredPackets = 1000; // Limit to prevent memory issues
         private bool _logCapturedPackets = false; // Enable/disable packet logging
-
+        private readonly ITestkitManagerService _testkitManager;
+        private readonly string _protocol;
         /// <summary>
         /// Event raised when a packet is captured.
         /// </summary>
-        public event EventHandler<PacketCapturedEventArgs>? PacketCaptured;
+        public event EventHandler<TcpNetworkFlow>? TcpFlowReceived;
+        public event EventHandler<HttpNetworkFlow>? HttpFlowReceived;
 
         /// <summary>
         /// Event raised when a log message needs to be written.
@@ -47,6 +44,11 @@ namespace NetworkMonitor.Services
             set => _logCapturedPackets = value;
         }
 
+        public PacketCaptureService(ITestkitManagerService testkitManagerService,string protocol)
+        {
+            _testkitManager = testkitManagerService;
+            _protocol = protocol;
+        }
         /// <summary>
         /// Starts capturing packets on the specified device.
         /// </summary>
@@ -55,9 +57,10 @@ namespace NetworkMonitor.Services
         /// <param name="customPorts">Custom port list if portsMode is custom.</param>
         /// <param name="cancellationToken">Cancellation token to stop capturing.</param>
         /// <returns>A task representing the asynchronous operation.</returns>
-        public Task StartCaptureAsync(ICaptureDevice device, string portsMode, string? customPorts, CancellationToken cancellationToken)
+        public Task StartCaptureAsync(ICaptureDevice device, string portsMode, string? customPorts,
+            CancellationToken cancellationToken, TaskCompletionSource<bool> startupSignal)
         {
-            return Task.Run(() => StartCapture(device, portsMode, customPorts, cancellationToken), cancellationToken);
+            return Task.Run(() => StartCapture(device, portsMode, customPorts, cancellationToken, startupSignal), cancellationToken);
         }
 
         /// <summary>
@@ -84,8 +87,10 @@ namespace NetworkMonitor.Services
         /// <summary>
         /// Starts the packet capture process.
         /// </summary>
-        private void StartCapture(ICaptureDevice device, string portsMode, string? customPorts, CancellationToken cancellationToken)
+        private void StartCapture(ICaptureDevice device, string portsMode, string? customPorts,
+            CancellationToken cancellationToken, TaskCompletionSource<bool> startupSignal)
         {
+            RaiseLogMessage("--- Start Monitor  ---", isError: false);
             _device = device;
 
             // Parse ports configuration
@@ -138,10 +143,12 @@ namespace NetworkMonitor.Services
                 device.StartCapture();
                 _isCapturing = true;
                 RaiseLogMessage(string.Format(Service_Keywords.SnifferStartedCapture, device.Description), false);
+                startupSignal.TrySetResult(true);
             }
             catch (Exception ex)
             {
                 RaiseLogMessage(string.Format(Service_Keywords.StartCaptureError, ex.GetType().Name, ex.Message), true);
+                startupSignal.TrySetException(ex);
                 return;
             }
 
@@ -230,6 +237,7 @@ namespace NetworkMonitor.Services
         /// </summary>
         private void Device_OnPacketArrival(object sender, PacketCapture e)
         {
+            RaiseLogMessage("--- Packet Arrived ---", isError: false);
             try
             {
                 var raw = e.GetPacket();
@@ -288,11 +296,9 @@ namespace NetworkMonitor.Services
                 if (!string.IsNullOrEmpty(httpLabel))
                     protocolLabel = httpLabel;
 
-                // Skip packets with no meaningful data
                 if (srcPort == 0 && dstPort == 0 && string.IsNullOrEmpty(decodedPayload))
                     return;
 
-                // Create packet captured event args
                 var eventArgs = new PacketCapturedEventArgs
                 {
                     SourceIp = srcIp,
@@ -306,21 +312,21 @@ namespace NetworkMonitor.Services
                     Timestamp = raw.Timeval.Date
                 };
 
-                // Store captured packet for service retrieval
-                StorePacket(eventArgs);
-
-                // Log captured packet if logging is enabled
-                if (_logCapturedPackets)
+                if (_protocol.Equals(Network_Keywords.ProtocolHTTP,StringComparison.OrdinalIgnoreCase))
                 {
-                    // Output as structured network flow object
                     var monitoredPort = GetMatchingMonitoredPort(eventArgs.SourcePort, eventArgs.DestinationPort);
-                    object flow = ConvertPacketToNetworkFlow(eventArgs, monitoredPort);
-                    var flowJson = NetworkFlowConverter.ToJson(flow);
-                    RaiseLogMessage($"[Network Flow Captured]\n{flowJson}", false);
+                    var flow = NetworkFlowConverter.ToHttpNetworkFlow(eventArgs, monitoredPort);
+                    _testkitManager.IngestHttpTransaction(flow);
+                }
+                else
+                {
+                    var monitoredPort = GetMatchingMonitoredPort(eventArgs.SourcePort, eventArgs.DestinationPort);
+                    var flow = NetworkFlowConverter.ToTcpNetworkFlow(eventArgs, monitoredPort);
+                    _testkitManager.IngestTcpTransaction(flow);
+
                 }
 
-                // Raise packet captured event
-                PacketCaptured?.Invoke(this, eventArgs);
+
             }
             catch (Exception ex)
             {
@@ -392,22 +398,6 @@ namespace NetworkMonitor.Services
             });
         }
 
-        /// <summary>
-        /// Stores a captured packet in the internal buffer.
-        /// </summary>
-        private void StorePacket(PacketCapturedEventArgs eventArgs)
-        {
-            lock (_packetsLock)
-            {
-                _capturedPackets.Add(eventArgs);
-
-                // Limit stored packets to prevent memory issues
-                if (_capturedPackets.Count > MaxStoredPackets)
-                {
-                    _capturedPackets.RemoveAt(0); // Remove oldest packet
-                }
-            }
-        }
 
         /// <summary>
         /// Gets all captured packets as formatted strings.
@@ -483,17 +473,6 @@ namespace NetworkMonitor.Services
             return result;
         }
 
-        /// <summary>
-        /// Gets all captured packets as structured network flow objects.
-        /// </summary>
-        /// <returns>List of network flow objects (TcpNetworkFlow or HttpNetworkFlow).</returns>
-        public List<object> GetCapturedNetworkFlows()
-        {
-            lock (_packetsLock)
-            {
-                return ConvertToNetworkFlows(_capturedPackets);
-            }
-        }
 
         /// <summary>
         /// Gets the most recent captured packets as structured network flow objects.
@@ -520,22 +499,6 @@ namespace NetworkMonitor.Services
             lock (_packetsLock)
             {
                 return ConvertToNetworkFlowsJson(_capturedPackets);
-            }
-        }
-
-        /// <summary>
-        /// Gets the most recent captured packets as JSON strings representing structured network flows.
-        /// </summary>
-        /// <param name="count">Number of recent packets to retrieve.</param>
-        /// <returns>List of JSON strings.</returns>
-        public List<string> GetRecentNetworkFlowsAsJson(int count)
-        {
-            lock (_packetsLock)
-            {
-                var recentPackets = _capturedPackets
-                    .Skip(Math.Max(0, _capturedPackets.Count - count))
-                    .ToList();
-                return ConvertToNetworkFlowsJson(recentPackets);
             }
         }
 
@@ -588,19 +551,6 @@ namespace NetworkMonitor.Services
         }
 
         /// <summary>
-        /// Gets the first monitored port if available, or null if monitoring all ports.
-        /// </summary>
-        private int? GetMonitoredPort()
-        {
-            if (_monitorAllPorts || _monitoredPorts == null || _monitoredPorts.Count == 0)
-                return null;
-
-            // Return the first monitored port for simplicity
-            // This will be used by helper methods that need a port reference
-            return _monitoredPorts[0];
-        }
-
-        /// <summary>
         /// Gets the monitored port that matches either the source or destination port.
         /// Returns null if no monitored port matches.
         /// </summary>
@@ -620,5 +570,8 @@ namespace NetworkMonitor.Services
             // No match found, but we have monitored ports - return first as fallback
             return _monitoredPorts.Count > 0 ? _monitoredPorts[0] : null;
         }
+
     }
+
+
 }

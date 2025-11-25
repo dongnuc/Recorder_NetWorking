@@ -5,6 +5,8 @@ namespace NetworkMonitor.Models
     /// </summary>
     public class HttpNetworkFlow
     {
+
+        public int Stage { get; set; }
         /// <summary>
         /// Gets or sets the timestamp when the packet was captured.
         /// </summary>

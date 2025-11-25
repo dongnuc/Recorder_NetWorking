@@ -1,15 +1,12 @@
 ﻿using Common.Interfaces.IOFile;
-using Common.Interfaces.Services; 
 using Common.Logging;
-using FileManagement.FileHelper.FileHandler;
 using FileManagement.FolderHelper;
 using Microsoft.Win32;
 using OfficeOpenXml;
-using System;
 using System.IO;
 using System.Windows;
-using WpfUI.ViewModels;
 using WpfUI.Properties;
+using WpfUI.ViewModels;
 
 namespace WpfUI
 {

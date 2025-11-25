@@ -1,8 +1,6 @@
-﻿using PacketDotNet;
+﻿﻿using NetworkMonitor.Models;
+using PacketDotNet;
 using SharpPcap;
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace NetworkMonitor.Abstractions
 {
@@ -14,7 +12,8 @@ namespace NetworkMonitor.Abstractions
         /// <summary>
         /// Event raised when a packet is captured.
         /// </summary>
-        event EventHandler<PacketCapturedEventArgs>? PacketCaptured;
+        event EventHandler<TcpNetworkFlow>? TcpFlowReceived;
+        event EventHandler<HttpNetworkFlow>? HttpFlowReceived;
 
         /// <summary>
         /// Event raised when a log message needs to be written.
@@ -35,7 +34,7 @@ namespace NetworkMonitor.Abstractions
         /// <param name="customPorts">Custom port list if portsMode is custom.</param>
         /// <param name="cancellationToken">Cancellation token to stop capturing.</param>
         /// <returns>A task representing the asynchronous operation.</returns>
-        Task StartCaptureAsync(ICaptureDevice device, string portsMode, string? customPorts, CancellationToken cancellationToken);
+        Task StartCaptureAsync(ICaptureDevice device, string portsMode, string? customPorts, CancellationToken cancellationToken, TaskCompletionSource<bool> startupSignal);
 
         /// <summary>
         /// Stops packet capture.

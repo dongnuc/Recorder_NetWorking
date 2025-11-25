@@ -8,6 +8,11 @@
     <UseWPF>true</UseWPF>
   </PropertyGroup>
 
+  <PropertyGroup>
+    <!-- ensure this points to the manifest file you added -->
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="EPPlus" Version="7.6.0" />
   </ItemGroup>
@@ -17,6 +22,7 @@
     <ProjectReference Include="..\DatabaseServices\DatabaseServices.csproj" />
     <ProjectReference Include="..\FileManagement\FileManagement.csproj" />
     <ProjectReference Include="..\Middleware\Middleware.csproj" />
+    <ProjectReference Include="..\NetworkMonitor\NetworkMonitor.csproj" />
     <ProjectReference Include="..\ProcessManagement\ProcessManagement.csproj" />
     <ProjectReference Include="..\TestKitManagement\TestKitManagement.csproj" />
   </ItemGroup>

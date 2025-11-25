@@ -1,4 +1,4 @@
-﻿using Common.Helper;
+﻿﻿using Common.Helper;
 using Common.Helper.Kernel32API;
 using Common.Interfaces.IOFile;
 using Common.Interfaces.Services;
@@ -6,15 +6,18 @@ using Common.Logging;
 using Common.Models.Entities;
 using Common.Resources;
 using FileManagement.FileHelper.FileHandler;
-using Middleware.Services;
+using NetworkMonitor.Models;
+using NetworkMonitor.Services;
+using SharpPcap;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
+using System.Net.WebSockets;
 using System.Runtime.CompilerServices;
-using System.Text.Json;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Data;
-using static Common.Models.Entities.MiddlewareModel;
+using WpfUI.Properties;
 using File = System.IO.File;
 
 namespace WpfUI
@@ -31,10 +34,6 @@ namespace WpfUI
         private ChildProcess _serverChild;
         private IntPtr _serverMutex;
         private CancellationTokenSource _serverCts;
-
-        // ✅ THÊM: Fields để lưu port thực tế
-        private int _actualServerPort = 0;
-        private string _serverExecutableDir = "";
 
         private int _currentStageIndex = 0;
         private readonly string _testCaseName;
@@ -112,17 +111,20 @@ namespace WpfUI
                 }
             }
         }
+
         #endregion
 
         private bool _isClientRunning = false;
         private bool _isServerRunning = false;
-        private bool _isMiddlewareRunning = false;
-        private int _proxyPort = -1;
-        private int _serverPort = -1;
+        private bool _isMonitorRunning = false;
         private string _testcasePath = string.Empty;
+        private string _portNetwork = string.Empty;
         private IOFileHandler _fileHandler;
         private readonly ITestkitManagerService _testkitManagerService;
-        private readonly object _middlewareLock = new object();
+        private PacketCaptureService _serviceMonitor;
+        private ILiveDevice _device;
+        private CancellationToken _ctsMonitor;
+        private bool _isInputFirst = false;
 
         #region Constructor
 
@@ -152,31 +154,45 @@ namespace WpfUI
         {
             this.DataContext = null;
         }
-
-        /// <summary>
-        /// ✅ SỬA: InitializeAsync() - KHÔNG CẦN GỌI AppSettingsManager.UpdateAppSettings
-        /// </summary>
-        public async Task InitializeAsync()
+        public async Task<bool> InitializeAsync()
         {
-            try
-            {
-                // ✅ Lưu folder của server exe để sau này đọc port file
-                _serverExecutableDir = Path.GetDirectoryName(_serverPath);
-                LogManager.Instance?.LogInfomation($"📂 Server directory: {_serverExecutableDir}");
+            //var (proxyPort, serverPort) = PortChecker.GetTwoAvailablePorts(8000, 9000);
 
-                // ✅ KHÔNG CẦN allocate port nữa, server sẽ tự dùng port từ appsettings
-                // var (proxyPort, serverPort) = PortChecker.GetTwoAvailablePorts(8000, 9000);
-                // if (!AppSettingsManager.UpdateAppSettings(_clientPath, proxyPort, _serverPath, serverPort))
-                // {...}
+            //if (!AppSettingsManager.UpdateAppSettings(_clientPath, proxyPort, _serverPath, serverPort))
+            //{
+            //    MessageBox.Show("Failed to update appsettings.json. Check log for details.", "Error",
+            //        MessageBoxButton.OK, MessageBoxImage.Error);
+            //    return false;
+            //}
 
-                await Task.Delay(500);
-                LogManager.Instance?.LogInfomation("✅ RecorderWindow initialized - Ready to start processes");
-            }
-            catch (Exception ex)
+            var protocol = Settings.Default.Protocol;
+            _serviceMonitor = new PacketCaptureService(_testkitManagerService,protocol);
+            var devices = SharpPcap.CaptureDeviceList.Instance;
+
+
+            if (devices.Count == 0)
             {
-                LogManager.Instance?.LogError($"❌ Error initializing RecorderWindow: {ex.Message}");
-                throw;
+                return false;
             }
+
+            _device = devices.FirstOrDefault(d =>
+                    d.Description != null &&
+                    d.Description.ToLower().Contains("loopback"));
+
+            // Nếu không tìm thấy Loopback, mới đành lấy cái đầu tiên (Fallback)
+            if (_device == null)
+            {
+                _device = devices.First();
+                LogManager.Instance.LogWarning("⚠️ Không tìm thấy Loopback Adapter! Đang sử dụng card mạng vật lý: " + _device.Description);
+                LogManager.Instance.LogWarning("Lưu ý: Bạn sẽ KHÔNG bắt được traffic localhost (127.0.0.1).");
+            }
+            else
+            {
+                LogManager.Instance.LogInfomation("✅ Đã chọn Loopback Adapter: " + _device.Description);
+            }
+            _ctsMonitor = new CancellationToken();
+            await Task.Delay(500);
+            return true;
         }
 
         #endregion
@@ -189,7 +205,8 @@ namespace WpfUI
             _testkitManagerService.OnStageCreated += OnStageCreated;
             _testkitManagerService.OnStageUpdated += OnStageUpdated;
             _testkitManagerService.OnStagesChanged += OnStagesChanged;
-            _testkitManagerService.OnTransactionReceived += OnTransactionReceived;
+
+            _testkitManagerService.OnQueueCountChanged += OnQueueCountChangedHandler;
             LogManager.Instance.LogDebug(" Subscribed to data sources with sequential processing");
         }
 
@@ -200,8 +217,8 @@ namespace WpfUI
                 _testkitManagerService.OnStageCreated -= OnStageCreated;
                 _testkitManagerService.OnStageUpdated -= OnStageUpdated;
                 _testkitManagerService.OnStagesChanged -= OnStagesChanged;
-                _testkitManagerService.OnTransactionReceived -= OnTransactionReceived;
 
+                _testkitManagerService.OnQueueCountChanged -= OnQueueCountChangedHandler;
             }
             LogManager.Instance.LogDebug(" Unsubscribed from data sources");
         }
@@ -209,14 +226,6 @@ namespace WpfUI
         #endregion
 
         #region Event Handlers - ProcessManager
-
-        private void OnTransactionReceived(NetworkTransaction transaction)
-        {
-            Dispatcher.Invoke(() =>
-            {
-                PendingTransactionCount = _testkitManagerService.GetPendingTransactionCount();
-            });
-        }
 
         /// <summary>
         /// Handle user input and create NEW STAGE
@@ -238,7 +247,6 @@ namespace WpfUI
 
                 OnPropertyChanged(nameof(TestStages));
 
-                PendingTransactionCount = _testkitManagerService.GetPendingTransactionCount();
             });
         }
 
@@ -286,123 +294,10 @@ namespace WpfUI
 
         #endregion
 
-        #region Helper Methods - Port Reading
-
-        // ✅ SỬA: Đọc port từ appsettings.json của server với retry logic
-        private async Task<int> ReadServerActualPortAsync()
+        #region Event Handlers - Network monitor
+        private void OnQueueCountChangedHandler(int count)
         {
-            var appSettingsFile = Path.Combine(_serverExecutableDir, "appsettings.json");
-
-            LogManager.Instance?.LogInfomation($"📂 Looking for appsettings.json: {appSettingsFile}");
-
-            // Chờ file tồn tại - tối đa 50 lần x 100ms = 5 giây
-            int fileRetries = 0;
-            while (!File.Exists(appSettingsFile) && fileRetries < 50)
-            {
-                await Task.Delay(100);
-                fileRetries++;
-            }
-
-            if (!File.Exists(appSettingsFile))
-            {
-                LogManager.Instance?.LogError($"❌ Could not find appsettings.json: {appSettingsFile}");
-                throw new FileNotFoundException($"appsettings.json not found: {appSettingsFile}");
-            }
-
-            LogManager.Instance?.LogInfomation($"✅ Found appsettings.json, now reading port...");
-
-            try
-            {
-                // Retry logic - đôi khi file vừa được ghi, chưa kịp flush
-                int parseRetries = 0;
-                int port = -1;
-
-                while (parseRetries < 5)
-                {
-                    try
-                    {
-                        // Thêm delay nhỏ trước khi đọc để file flush dữ liệu
-                        await Task.Delay(200);
-
-                        // Đọc file JSON với FileShare.Read để cho phép file bị lock
-                        string jsonContent;
-                        using (var fileStream = new FileStream(appSettingsFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
-                        using (var reader = new StreamReader(fileStream))
-                        {
-                            jsonContent = await reader.ReadToEndAsync();
-                        }
-
-                        LogManager.Instance?.LogDebug($"📄 appsettings.json content:\n{jsonContent}");
-
-                        // Parse JSON để lấy Port
-                        using (JsonDocument doc = JsonDocument.Parse(jsonContent))
-                        {
-                            JsonElement root = doc.RootElement;
-
-                            if (root.TryGetProperty("Port", out JsonElement portElement))
-                            {
-                                string portText = portElement.GetString();
-
-                                if (int.TryParse(portText, out port))
-                                {
-                                    if (port > 0 && port < 65536)
-                                    {
-                                        LogManager.Instance?.LogInfomation($"✅ Server port read from appsettings.json: {port}");
-                                        return port;
-                                    }
-                                    else
-                                    {
-                                        LogManager.Instance?.LogWarning($"⚠️ Invalid port range: {port}, retrying...");
-                                        parseRetries++;
-                                        continue;
-                                    }
-                                }
-                                else
-                                {
-                                    LogManager.Instance?.LogWarning($"⚠️ Could not parse port: {portText}, retrying...");
-                                    parseRetries++;
-                                    continue;
-                                }
-                            }
-                            else
-                            {
-                                LogManager.Instance?.LogWarning($"⚠️ 'Port' field not found, retrying...");
-                                parseRetries++;
-                                continue;
-                            }
-                        }
-                    }
-                    catch (JsonException ex)
-                    {
-                        LogManager.Instance?.LogWarning($"⚠️ Error parsing JSON (attempt {parseRetries + 1}/5): {ex.Message}");
-                        parseRetries++;
-                        await Task.Delay(300);
-                        continue;
-                    }
-                    catch (IOException ex)
-                    {
-                        LogManager.Instance?.LogWarning($"⚠️ File is locked or being written (attempt {parseRetries + 1}/5): {ex.Message}");
-                        parseRetries++;
-                        await Task.Delay(300);
-                        continue;
-                    }
-                }
-
-                // Nếu vẫn không đọc được sau 5 lần retry
-                if (port <= 0 || port >= 65536)
-                {
-                    LogManager.Instance?.LogError($"❌ Failed to read valid port after {parseRetries} attempts");
-                    throw new InvalidOperationException($"Could not read valid port from appsettings.json after {parseRetries} retry attempts");
-                }
-
-                return port;
-            }
-            catch (Exception ex)
-            {
-                LogManager.Instance?.LogError($"❌ Error reading port from appsettings.json: {ex.Message}");
-                LogManager.Instance?.LogError($"Stack trace: {ex.StackTrace}");
-                throw;
-            }
+            Dispatcher.Invoke(() => PendingTransactionCount = count);
         }
 
         #endregion
@@ -417,7 +312,6 @@ namespace WpfUI
                 return;
             }
 
-            // Prevent deleting stage 1 (initial connection stage)
             if (SelectedStageKey == 1)
             {
                 var confirmResult = MessageBox.Show(
@@ -438,42 +332,27 @@ namespace WpfUI
 
             if (result == MessageBoxResult.Yes)
             {
-                // Get test stages from TestkitManagerService
-                var testStages = _testkitManagerService.GetCurrentTestStages();
-                if (testStages.ContainsKey(SelectedStageKey))
+
+                _testkitManagerService.DeleteStage(SelectedStageKey);
+
+                if (StageKeys.Contains(SelectedStageKey))
                 {
-                    // Remove stage from dictionary
-                    testStages.Remove(SelectedStageKey);
-
-                    // Remove from UI collection
                     StageKeys.Remove(SelectedStageKey);
+                }
 
-                    // Select another stage if available
-                    if (StageKeys.Any())
-                    {
-                        SelectedStageKey = StageKeys.First();
-                    }
-                    else
-                    {
-                        // No stages left, clear selected data
-                        SelectedStageData = new TestStage();
-                    }
-
-                    LogManager.Instance.LogInfomation($" Stage {SelectedStageKey} deleted");
-
-                    // Notify UI to refresh
-                    OnPropertyChanged(nameof(TestStages));
-                    OnPropertyChanged(nameof(SelectedStageData));
+                if (StageKeys.Any())
+                {
+                    SelectedStageKey = StageKeys.Last();
                 }
                 else
                 {
-                    LogManager.Instance.LogWarning($" Stage {SelectedStageKey} not found in TestkitManagerService");
-                    MessageBox.Show(
-                        $"Stage {SelectedStageKey} not found.",
-                        "Error",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Error);
+                    SelectedStageKey = 0;
+                    SelectedStageData = new TestStage(); 
                 }
+
+                // Notify UI refresh
+                OnPropertyChanged(nameof(TestStages));
+                OnPropertyChanged(nameof(SelectedStageData));
             }
         }
 
@@ -568,14 +447,71 @@ namespace WpfUI
             if (result == MessageBoxResult.Yes)
             {
                 var testStages = _testkitManagerService.GetCurrentTestStages();
+
+                // Kiểm tra xem Stage hiện tại có tồn tại không
                 if (testStages.TryGetValue(SelectedStageKey, out var currentStage))
                 {
-                    currentStage.Network = new Network();
+                    // --- XỬ LÝ XÓA DỮ LIỆU TẠI ĐÂY ---
+
+                    // 1. Xóa danh sách HTTP (nếu có)
+                    if (currentStage.NetworkHttpFlows != null)
+                    {
+                        currentStage.NetworkHttpFlows.Clear();
+                    }
+
+                    // 2. Xóa danh sách TCP (nếu có)
+                    if (currentStage.NetworkTcpFlows != null)
+                    {
+                        currentStage.NetworkTcpFlows.Clear();
+                    }
+
+                    // 3. Cập nhật lại UI (TextBox chi tiết sẽ tự rỗng do Binding)
                     OnPropertyChanged(nameof(SelectedStageData));
-                    LogManager.Instance.LogDebug($" Network data cleared for Stage {SelectedStageKey}");
+
+                    LogManager.Instance.LogDebug($"Network data cleared for Stage {SelectedStageKey}");
                 }
             }
         }
+
+
+        #region Delete Single Row Methods
+
+        private void BtnDeleteTcpRow_Click(object sender, RoutedEventArgs e)
+        {
+            if (dgTcp.SelectedItem is NetworkMonitor.Models.TcpNetworkFlow selectedItem)
+            {
+                var collection = SelectedStageData?.NetworkTcpFlows;
+
+                if (collection != null)
+                {
+                    collection.Remove(selectedItem);
+
+                }
+            }
+            else
+            {
+                MessageBox.Show("Please select a row to delete.", "Info", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+        }
+
+        private void BtnDeleteHttpRow_Click(object sender, RoutedEventArgs e)
+        {
+            if (dgHttp.SelectedItem is NetworkMonitor.Models.HttpNetworkFlow selectedItem)
+            {
+                var collection = SelectedStageData?.NetworkHttpFlows;
+
+                if (collection != null)
+                {
+                    collection.Remove(selectedItem);
+                }
+            }
+            else
+            {
+                MessageBox.Show("Please select a row to delete.", "Info", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+        }
+
+        #endregion
 
         #endregion
 
@@ -679,10 +615,6 @@ namespace WpfUI
                 }
                 LogManager.Instance.LogInfomation("Client process stopped successfully");
 
-                if (!_isClientRunning && _isMiddlewareRunning && !_isClosing)
-                {
-                    await StopMiddlewareAsync();
-                }
             }
             catch (Exception ex)
             {
@@ -692,37 +624,6 @@ namespace WpfUI
             }
 
         }
-        private async Task StopMiddlewareAsync()
-        {
-            bool shouldStop = false;
-            lock (_middlewareLock)
-            {
-                if (_isMiddlewareRunning)
-                {
-                    _isMiddlewareRunning = false;
-                    shouldStop = true;
-                }
-            }
-            if (!shouldStop)
-            {
-                LogManager.Instance.LogDebug("Middleware already stopped by another thread");
-                return;
-            }
-            try
-            {
-                if (MiddlewareStart.Instance.IsRunning)
-                {
-                    LogManager.Instance.LogDebug("Stopping middleware...");
-                    await Task.Delay(200);
-                    await MiddlewareStart.Instance.StopAsync();
-                }
-            }
-            catch (Exception ex)
-            {
-            }
-
-        }
-
         private async Task CloseServerAsync()
         {
             try
@@ -754,10 +655,6 @@ namespace WpfUI
 
                 LogManager.Instance.LogInfomation("Server process stopped successfully");
 
-                if (!_isServerRunning && _isMiddlewareRunning && !_isClosing)
-                {
-                    await StopMiddlewareAsync();
-                }
             }
             catch (Exception ex)
             {
@@ -776,6 +673,17 @@ namespace WpfUI
         protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+        private void dgTcp_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (dgTcp.SelectedItem is TcpNetworkFlow selectedItem)
+            {
+                txtTcpPayload.Text = selectedItem.Data;
+            }
+            else
+            {
+                txtTcpPayload.Text = "";
+            }
         }
 
         #endregion
@@ -824,10 +732,17 @@ namespace WpfUI
                     .Cast<object>()
                     .ToList();
 
-                var allNetworks = testStages
+                var allNetworksTCP = testStages
                     .OrderBy(x => x.Key)
-                    .Where(stage => stage.Value.Network != null && stage.Value.Network.Stage > 0)
-                    .Select(stage => stage.Value.Network)
+                    .Where(stage => stage.Value.NetworkTcpFlows != null && stage.Value.NetworkTcpFlows.Count > 0)
+                    .SelectMany(stage => stage.Value.NetworkTcpFlows)
+                    .Cast<object>()
+                    .ToList ();
+
+                var allNetworksHTTP= testStages
+                    .OrderBy(x => x.Key)
+                    .Where(stage => stage.Value.NetworkHttpFlows != null && stage.Value.NetworkHttpFlows.Count > 0)
+                    .SelectMany(stage => stage.Value.NetworkHttpFlows)
                     .Cast<object>()
                     .ToList();
 
@@ -837,7 +752,7 @@ namespace WpfUI
                     ("Client", allClients),
                     ("Server", allServers),
                     ("Database", allDatabases),
-                    ("Network", allNetworks)
+                    ("Network",allNetworksTCP.Count > 0  ? allNetworksTCP : allNetworksHTTP),
                 };
                 if (!sheetsList.Any())
                 {
@@ -960,20 +875,13 @@ namespace WpfUI
         {
             if (_isClientRunning)
             {
-                MessageBox.Show("Client is already running.", "Info", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show("Server is already running.", "Info", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
             if (!File.Exists(_clientPath))
             {
                 throw new FileNotFoundException($"Client executable not found: {_clientPath}");
-            }
-
-            // ✅ Kiểm tra server port
-            if (_actualServerPort == 0)
-            {
-                MessageBox.Show("❌ Server port not available.\n\nPlease start the Server first!", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                return;
             }
 
             if (_clientMutex != IntPtr.Zero && _clientCts != null)
@@ -999,19 +907,16 @@ namespace WpfUI
                     _currentStageIndex = 1;
                 }
 
-                // ❌ XÓA: Không khởi động middleware
-                // if (!_isMiddlewareRunning && _isServerRunning)
-                // {
-                //     LogManager.Instance.LogInfomation("Starting middleware...");
-                //     await MiddlewareStart.Instance.StartAsync(_proxyPort, _serverPort, _isHttp);
-                //     _isMiddlewareRunning = true;
-                // }
-
                 BtnStartClient.IsEnabled = false;
                 _testkitManagerService.CreateInitialStage(ActionKeywords.START_CLIENT);
 
-                // ✅ Client kết nối trực tiếp tới server (KHÔNG QUA MIDDLEWARE)
-                LogManager.Instance?.LogInfomation($"🚀 Starting client - connecting directly to server on port {_actualServerPort}");
+                if (!_isMonitorRunning)
+                {
+                    var startupSignal = new TaskCompletionSource<bool>();
+                    Task monitorTask = _serviceMonitor.StartCaptureAsync(_device, "8000", "", _ctsMonitor, startupSignal);
+                    await startupSignal.Task;
+                    _isMonitorRunning = true;
+                }
 
                 var clientResult = await _processManager.StartSingleWithPollingAsync(
                     _clientPath,
@@ -1020,18 +925,18 @@ namespace WpfUI
                     showConsoleMessages: false
                 );
 
+                //  ASSIGN to fields
                 _clientChild = clientResult.child;
                 _clientMutex = clientResult.mutex;
                 _clientCts = clientResult.cts;
 
                 _isClientRunning = true;
-                UpdateProcessButtonStates();
 
-                LogManager.Instance?.LogInfomation($"✅ Client started - connected directly to server on port {_actualServerPort}");
+                UpdateProcessButtonStates();
+                
             }
             catch (Exception ex)
             {
-                LogManager.Instance.LogError($"❌ Error starting client: {ex.Message}");
             }
             finally
             {
@@ -1076,20 +981,9 @@ namespace WpfUI
                     _currentStageIndex = 1;
                 }
 
-                // ❌ XÓA: Không khởi động middleware
-                // if (!_isMiddlewareRunning && _isClientRunning)
-                // {
-                //     LogManager.Instance.LogInfomation("Starting middleware...");
-                //     await MiddlewareStart.Instance.StartAsync(_proxyPort, _serverPort, _isHttp);
-                //     _isMiddlewareRunning = true;
-                // }
-
                 _testkitManagerService.CreateInitialStage(ActionKeywords.START_SERVER);
 
                 BtnStartServer.IsEnabled = false;
-
-                // ✅ Khởi động server
-                LogManager.Instance?.LogInfomation("🚀 Starting server process...");
                 var serverResult = await _processManager.StartSingleWithPollingAsync(
                     _serverPath,
                     "Server",
@@ -1103,29 +997,19 @@ namespace WpfUI
 
                 _isServerRunning = true;
 
-                // ✅ Chờ server khởi động hoàn toàn
-                LogManager.Instance?.LogInfomation("⏳ Waiting for server to fully initialize...");
-                await Task.Delay(2000);
-
-                // ✅ Đọc port thực tế từ appsettings.json
-                try
-                {
-                    _actualServerPort = await ReadServerActualPortAsync();
-                    LogManager.Instance?.LogInfomation($"🔌 Server running on actual port: {_actualServerPort}");
-                }
-                catch (Exception ex)
-                {
-                    LogManager.Instance?.LogError($"❌ Failed to read server port: {ex.Message}");
-                    MessageBox.Show($"Warning: Could not read server port.\n\n{ex.Message}", "Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
-                }
-
                 UpdateProcessButtonStates();
+                if (!_isMonitorRunning)
+                {
+                    var startupSignal = new TaskCompletionSource<bool>();
+                    Task monitorTask = _serviceMonitor.StartCaptureAsync(_device, "8000", "", _ctsMonitor, startupSignal);
+                    await startupSignal.Task;
+                    _isMonitorRunning = true;
+                }
                 await Task.Delay(1000);
             }
             catch (Exception ex)
             {
-                LogManager.Instance.LogError($"❌ Error starting server: {ex.Message}");
-                MessageBox.Show($"Error starting server: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                LogManager.Instance.LogError($"Error starting server: {ex.Message}");
             }
             finally
             {
@@ -1139,7 +1023,9 @@ namespace WpfUI
             {
                 LogManager.Instance?.LogInfomation("🛑 Cleaning up RecorderWindow resources...");
 
-                // Unsubscribe from events FIRST
+                // Un
+                //
+                // scribe from events FIRST
                 UnsubscribeFromDataSources();
 
                 var tasks = new List<Task>();
@@ -1182,23 +1068,12 @@ namespace WpfUI
                     await Task.WhenAll(tasks);
                 }
                 await Task.Delay(1000);
-                // Stop middleware
-                if (_isMiddlewareRunning)
-                {
-                    try
-                    {
-                        await StopMiddlewareAsync();
-                    }
-                    catch (Exception ex)
-                    {
-                        LogManager.Instance?.LogWarning($"Middleware stop failed: {ex.Message}");
-                    }
-                }
 
                 // Dispose ProcessManager
                 try
                 {
                     _processManager?.Dispose();
+                    _serviceMonitor.StopCapture();
                 }
                 catch (Exception ex)
                 {
@@ -1213,5 +1088,11 @@ namespace WpfUI
                 LogManager.Instance?.LogError($"Stack trace: {ex.StackTrace}");
             }
         }
+
+        private void BtnFlushNetwork_Click(object sender, RoutedEventArgs e)
+        {
+            _testkitManagerService.FlushNetworkQueue();
+        }
+
     }
 }

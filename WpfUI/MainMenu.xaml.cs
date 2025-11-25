@@ -162,7 +162,6 @@ namespace WpfUI
 
                 if (string.IsNullOrEmpty(testcasePath)) return;
 
-                LogManager.Instance.LogInfomation(dialog.InputText.ToString());
                 bool isHttp = Settings.Default.Protocol == "HTTP";
 
                 await CreateRecorderTab(testcasePath, testcaseName, clientPath, serverPath, isHttp);
@@ -214,7 +213,7 @@ namespace WpfUI
             }
         }
 
-        #region recorder tab (Code cũ của bạn, giữ nguyên)
+        #region recorder tab 
         private async Task CreateRecorderTab(string testcasePath, string testcaseName, string clientPath, string serverPath, bool isHttp)
         {
             RecorderWindowScope scope = null;

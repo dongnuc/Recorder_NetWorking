@@ -10,6 +10,7 @@
     <ProjectReference Include="..\Common\Common.csproj" />
     <ProjectReference Include="..\FileManagement\FileManagement.csproj" />
     <ProjectReference Include="..\Middleware\Middleware.csproj" />
+    <ProjectReference Include="..\NetworkMonitor\NetworkMonitor.csproj" />
   </ItemGroup>
 
   <ItemGroup>

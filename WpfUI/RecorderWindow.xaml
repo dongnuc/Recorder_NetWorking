@@ -10,7 +10,6 @@
     <Grid>
         <DockPanel>
 
-            <!-- ✅ Top Bar: Export + Process Controls -->
             <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="5">
                 <Border Background="#2C3E50" 
                         Padding="10,5" 
@@ -31,7 +30,6 @@
                                    MinWidth="20"
                                    TextAlignment="Center"/>
 
-                        <!-- ✅ Warning icon -->
                         <TextBlock Text="⚠️" 
                                    Foreground="Yellow"
                                    FontSize="12"
@@ -63,10 +61,8 @@
                         Padding="5"
                         ToolTip="Export all test data to Excel file"/>
 
-                <!-- Separator -->
                 <Separator Width="2" Background="LightGray" Margin="10,0"/>
 
-                <!-- ✅ Start/Close Client Buttons -->
                 <Button x:Name="BtnStartClient"
                         Content="▶️ Start Client" 
                         Width="120" 
@@ -93,7 +89,6 @@
                         ToolTip="Stop and close the client process"
                         Visibility="Collapsed"/>
 
-                <!-- ✅ Start/Close Server Buttons -->
                 <Button x:Name="BtnStartServer"
                         Content="▶️ Start Server" 
                         Width="120" 
@@ -121,7 +116,6 @@
                         Visibility="Collapsed"/>
             </StackPanel>
 
-            <!-- ✅ Stage Selection + Delete Stage Button -->
             <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="5">
                 <Label Content="Select Stage:" Margin="5,0,0,0" VerticalAlignment="Center" FontWeight="Bold"/>
                 <ComboBox x:Name="cmbStages"
@@ -136,7 +130,6 @@
                     <Run Text="{Binding StageKeys.Count, Mode=OneWay}" FontWeight="Bold"/>
                 </TextBlock>
 
-                <!-- ✅ Delete Stage Button -->
                 <Button Content="🗑️ Delete Stage" 
                         Width="120" 
                         Margin="20,0,0,0" 
@@ -150,17 +143,13 @@
                         ToolTip="Delete the selected stage and all its data"/>
             </StackPanel>
 
-            <!-- ✅ Main Content: Split Top (User - Compact) and Bottom (Outputs - Maximum Space) -->
             <Grid Margin="5">
                 <Grid.RowDefinitions>
-                    <!-- ✅ User Input chỉ chiếm 55px (1 hàng) -->
                     <RowDefinition Height="55"/>
                     <RowDefinition Height="5"/>
-                    <!-- ✅ Outputs chiếm toàn bộ không gian còn lại -->
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
 
-                <!-- ============= TOP SECTION: USER INPUT (SINGLE ROW - COMPACT) ============= -->
                 <GroupBox Grid.Row="0" Header="👤 User Input">
                     <Grid Margin="5,0,5,0">
                         <Grid.ColumnDefinitions>
@@ -173,7 +162,6 @@
                             <ColumnDefinition Width="40"/>
                         </Grid.ColumnDefinitions>
 
-                        <!-- Stage -->
                         <Label Grid.Column="0" Content="Stage:" FontWeight="Bold" VerticalAlignment="Center" Padding="0"/>
                         <TextBox Grid.Column="1" 
                                  Text="{Binding SelectedStageData.User.Stage, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" 
@@ -181,7 +169,6 @@
                                  VerticalAlignment="Center"
                                  Height="24"/>
 
-                        <!-- Action -->
                         <Label Grid.Column="2" Content="Action:" FontWeight="Bold" VerticalAlignment="Center" Padding="0" Margin="8,0,0,0"/>
                         <TextBox Grid.Column="3" 
                                  Text="{Binding SelectedStageData.User.Action, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" 
@@ -189,7 +176,6 @@
                                  VerticalAlignment="Center"
                                  Height="24"/>
 
-                        <!-- Input -->
                         <Label Grid.Column="4" Content="Input:" FontWeight="Bold" VerticalAlignment="Center" Padding="0" Margin="8,0,0,0"/>
                         <TextBox Grid.Column="5" 
                                  Text="{Binding SelectedStageData.User.Input, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" 
@@ -197,7 +183,6 @@
                                  VerticalAlignment="Center"
                                  Height="24"/>
 
-                        <!-- Clear Button -->
                         <Button Grid.Column="6" 
                                 Content="🧹" 
                                 Click="BtnClearInputClient_Click"
@@ -214,7 +199,6 @@
                     </Grid>
                 </GroupBox>
 
-                <!-- ============= SPLITTER ============= -->
                 <GridSplitter Grid.Row="1" 
                               Height="5" 
                               HorizontalAlignment="Stretch" 
@@ -222,10 +206,8 @@
                               Background="LightGray"
                               ShowsPreview="True"/>
 
-                <!-- ============= BOTTOM SECTION: OUTPUTS (TABS - MAXIMUM SPACE) ============= -->
                 <GroupBox Grid.Row="2" Header="📊 Outputs" Margin="0,5,0,0">
                     <TabControl>
-                        <!-- Tab 1: Client Output -->
                         <TabItem Header="💻 Client">
                             <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                                 <Grid>
@@ -255,13 +237,11 @@
                                             <RowDefinition Height="Auto"/>
                                         </Grid.RowDefinitions>
 
-                                        <!-- Stage -->
                                         <Label Grid.Row="0" Grid.Column="0" Content="Stage:" FontWeight="Bold" Margin="5"/>
                                         <TextBox Grid.Row="0" Grid.Column="1" 
                                                  Text="{Binding SelectedStageData.Client.Stage, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" 
                                                  Margin="5"/>
 
-                                        <!-- Console -->
                                         <Label Grid.Row="1" Grid.Column="0" Content="Console:" FontWeight="Bold" Margin="5" VerticalAlignment="Top"/>
                                         <TextBox Grid.Row="1" Grid.Column="1" 
                                                  Text="{Binding SelectedStageData.Client.Console, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" 
@@ -275,7 +255,6 @@
                             </ScrollViewer>
                         </TabItem>
 
-                        <!-- Tab 2: Server Output -->
                         <TabItem Header="🖥️ Server">
                             <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                                 <Grid>
@@ -305,13 +284,11 @@
                                             <RowDefinition Height="Auto"/>
                                         </Grid.RowDefinitions>
 
-                                        <!-- Stage -->
                                         <Label Grid.Row="0" Grid.Column="0" Content="Stage:" FontWeight="Bold" Margin="5"/>
                                         <TextBox Grid.Row="0" Grid.Column="1" 
                                                  Text="{Binding SelectedStageData.Server.Stage, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" 
                                                  Margin="5"/>
 
-                                        <!-- Console -->
                                         <Label Grid.Row="1" Grid.Column="0" Content="Console:" FontWeight="Bold" Margin="5" VerticalAlignment="Top"/>
                                         <TextBox Grid.Row="1" Grid.Column="1" 
                                                  Text="{Binding SelectedStageData.Server.Console, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" 
@@ -325,7 +302,6 @@
                             </ScrollViewer>
                         </TabItem>
 
-                        <!-- Tab 3: Database -->
                         <TabItem Header="🗄️ Database">
                             <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                                 <Grid>
@@ -356,13 +332,11 @@
                                             <RowDefinition Height="Auto"/>
                                         </Grid.RowDefinitions>
 
-                                        <!-- Stage -->
                                         <Label Grid.Row="0" Grid.Column="0" Content="Stage:" FontWeight="Bold" Margin="5"/>
                                         <TextBox Grid.Row="0" Grid.Column="1" 
                                                  Text="{Binding SelectedStageData.Database.Stage, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" 
                                                  Margin="5"/>
 
-                                        <!-- Query -->
                                         <Label Grid.Row="1" Grid.Column="0" Content="Query:" FontWeight="Bold" Margin="5" VerticalAlignment="Top"/>
                                         <TextBox Grid.Row="1" Grid.Column="1" 
                                                  Text="{Binding SelectedStageData.Database.Query, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" 
@@ -372,7 +346,6 @@
                                                  AcceptsReturn="True"
                                                  VerticalScrollBarVisibility="Disabled"/>
 
-                                        <!-- Expected Data -->
                                         <Label Grid.Row="2" Grid.Column="0" Content="Expected Data:" FontWeight="Bold" Margin="5" VerticalAlignment="Top"/>
                                         <TextBox Grid.Row="2" Grid.Column="1" 
                                                  Text="{Binding SelectedStageData.Database.ExpectedData, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" 
@@ -386,82 +359,240 @@
                             </ScrollViewer>
                         </TabItem>
 
-                        <!-- Tab 4: Network -->
-                        <!-- Tab 4: Network -->
-                        <TabItem Header="🌐 Network">
-                            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                <Grid>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                    </Grid.RowDefinitions>
+                        <TabItem Header="🌐 Network List">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
 
-                                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="5" HorizontalAlignment="Right">
-                                        <Button Content="🧹 Clear Data" 
+                                <Border Grid.Row="0" Background="#F8F9FA" Padding="8,5" BorderBrush="#E0E0E0" BorderThickness="0,0,0,1">
+                                    <DockPanel>
+                                        <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
+                                            <TextBlock Text="Protocol View:" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,5,0" Foreground="#2C3E50"/>
+                                            <ComboBox x:Name="cmbNetworkType" Width="160" SelectedIndex="0" VerticalAlignment="Center" >
+                                                <ComboBoxItem Content="🔌 TCP Traffic"/>
+                                                <ComboBoxItem Content="🌐 HTTP Traffic"/>
+                                            </ComboBox>
+
+                                            <TextBlock Margin="20,0,0,0" VerticalAlignment="Center">
+                <Run Text="Queue Buffer: " FontWeight="Bold" Foreground="#7F8C8D"/>
+                <Run Text="{Binding PendingTransactionCount}" FontWeight="Bold" Foreground="#E74C3C"/>
+                                            </TextBlock>
+
+                                            <Button Content="⬇️ Flush Queue" 
+                    Margin="10,0,0,0"
+                    Padding="10,5"
+                    Background="#3498DB"
+                    Foreground="White"
+                    BorderThickness="0"
+                    Cursor="Hand"
+                    Click="BtnFlushNetwork_Click"
+                    ToolTip="Push buffered network data to the list"/>
+                                        </StackPanel>
+
+                                        <Button DockPanel.Dock="Right" 
+                        Content="🧹 Clear Logs" 
                         Click="BtnClearNetwork_Click"
-                        Background="#E67E22" 
+                        HorizontalAlignment="Right"
+                        Background="#E74C3C" 
                         Foreground="White"
                         BorderThickness="0" 
                         Cursor="Hand"
-                        Padding="8,4"
-                        ToolTip="Clear network data for current stage"/>
-                                    </StackPanel>
+                        Padding="10,5"
+                        FontWeight="SemiBold"
+                        ToolTip="Clear all captured network logs"/>
+                                    </DockPanel>
+                                </Border>
 
-                                    <Grid Grid.Row="1" Margin="5">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
+                                <Grid Grid.Row="1">
+
+                                    <Grid x:Name="GridTcpView">
+                                        <Grid.Style>
+                                            <Style TargetType="Grid">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding SelectedIndex, ElementName=cmbNetworkType}" Value="0">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Grid.Style>
+
                                         <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="2*"/>
+                                            <RowDefinition Height="5"/>
+                                            <RowDefinition Height="1*"/>
                                         </Grid.RowDefinitions>
 
-                                        <!-- Stage -->
-                                        <Label Grid.Row="0" Grid.Column="0" Content="Stage:" FontWeight="Bold" Margin="5"/>
-                                        <TextBox Grid.Row="0" Grid.Column="1" 
-                         Text="{Binding SelectedStageData.Network.Stage, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" 
-                         Margin="5"/>
+                                        <DataGrid x:Name="dgTcp"
+              Grid.Row="0"
+              ItemsSource="{Binding SelectedStageData.NetworkTcpFlows}"
+              AutoGenerateColumns="False"
+              CanUserAddRows="False"
+              IsReadOnly="True"
+              SelectionMode="Single"
+              HeadersVisibility="Column"
+              GridLinesVisibility="Horizontal"
+              Background="White"
+              RowHeight="25"
+              BorderThickness="0">
+                                            <DataGrid.ContextMenu>
+                                                <ContextMenu>
+                                                    <MenuItem Header="❌ Delete Selected Row" Click="BtnDeleteTcpRow_Click"/>
+                                                </ContextMenu>
+                                            </DataGrid.ContextMenu>
+                                            <DataGrid.Columns>
+                                                <DataGridTextColumn Header="Time" Binding="{Binding Time}" Width="90"/>
+                                                <DataGridTextColumn Header="Info" Binding="{Binding Info}" Width="150"/>
+                                                <DataGridTextColumn Header="Source IP:Port" Binding="{Binding Source}" Width="140" FontWeight="SemiBold"/>
+                                                <DataGridTextColumn Header="Src Role" Binding="{Binding SourceRole}" Width="80" Foreground="Gray"/>
+                                                <DataGridTextColumn Header="Dest IP:Port" Binding="{Binding Destination}" Width="140" FontWeight="SemiBold"/>
+                                                <DataGridTextColumn Header="Dst Role" Binding="{Binding DestinationRole}" Width="80" Foreground="Gray"/>
+                                                <DataGridTextColumn Header="Flags" Binding="{Binding Flags}" Width="80" FontWeight="Bold" Foreground="#E67E22"/>
+                                                <DataGridTextColumn Header="State" Binding="{Binding State}" Width="80"/>
 
-                                        <!-- URL -->
-                                        <Label Grid.Row="1" Grid.Column="0" Content="URL:" FontWeight="Bold" Margin="5"/>
-                                        <TextBox Grid.Row="1" Grid.Column="1" 
-                         Text="{Binding SelectedStageData.Network.Url, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" 
-                         Margin="5"/>
+                                                <DataGridTextColumn Header="Preview Data" Binding="{Binding Data}" Width="*" Foreground="#34495E">
+                                                    <DataGridTextColumn.ElementStyle>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                                                            <Setter Property="ToolTip" Value="{Binding Data}"/>
+                                                        </Style>
+                                                    </DataGridTextColumn.ElementStyle>
+                                                </DataGridTextColumn>
+                                            </DataGrid.Columns>
+                                        </DataGrid>
 
-                                        <!-- HttpMethod -->
-                                        <Label Grid.Row="2" Grid.Column="0" Content="HTTP Method:" FontWeight="Bold" Margin="5"/>
-                                        <TextBox Grid.Row="2" Grid.Column="1" 
-                         Text="{Binding SelectedStageData.Network.HttpMethod, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" 
-                         Margin="5"
-                         ToolTip="HTTP Method (GET, POST, PUT, DELETE, etc.)"/>
+                                        <GridSplitter Grid.Row="1" Height="5" HorizontalAlignment="Stretch" Background="#BDC3C7" ShowsPreview="True"/>
 
-                                        <!-- Request Payload -->
-                                        <Label Grid.Row="3" Grid.Column="0" Content="REQ Payload:" FontWeight="Bold" Margin="5" VerticalAlignment="Top"/>
-                                        <TextBox Grid.Row="3" Grid.Column="1" 
-                         Text="{Binding SelectedStageData.Network.REQ_Payload, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" 
-                         Margin="5"
-                         MinHeight="200"
-                         TextWrapping="Wrap"
-                         AcceptsReturn="True"
-                         VerticalScrollBarVisibility="Disabled"/>
-
-                                        <!-- Response Payload -->
-                                        <Label Grid.Row="4" Grid.Column="0" Content="RES Payload:" FontWeight="Bold" Margin="5" VerticalAlignment="Top"/>
-                                        <TextBox Grid.Row="4" Grid.Column="1" 
-                         Text="{Binding SelectedStageData.Network.RES_Payload, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" 
-                         Margin="5"
-                         MinHeight="200"
-                         TextWrapping="Wrap"
-                         AcceptsReturn="True"
-                         VerticalScrollBarVisibility="Disabled"/>
+                                        <GroupBox Grid.Row="2" Header="📦 TCP Payload Data (Detail View)" Margin="5" BorderBrush="#3498DB">
+                                            <TextBox x:Name="txtTcpPayload"
+                 Text="{Binding ElementName=dgTcp, Path=SelectedItem.Data, Mode=OneWay, UpdateSourceTrigger=PropertyChanged}"
+                 TextWrapping="Wrap"
+                 AcceptsReturn="True"
+                 VerticalScrollBarVisibility="Auto"
+                 IsReadOnly="True"
+                 FontFamily="Consolas"
+                 FontSize="12"
+                 Padding="5"
+                 BorderThickness="0"/>
+                                        </GroupBox>
                                     </Grid>
+
+                                    <Grid x:Name="GridHttpView">
+                                        <Grid.Style>
+                                            <Style TargetType="Grid">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding SelectedIndex, ElementName=cmbNetworkType}" Value="1">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Grid.Style>
+
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="2*"/>
+                                            <RowDefinition Height="5"/>
+                                            <RowDefinition Height="1*"/>
+                                        </Grid.RowDefinitions>
+
+                                        <DataGrid x:Name="dgHttp"
+          Grid.Row="0"
+          ItemsSource="{Binding SelectedStageData.NetworkHttpFlows}"
+          AutoGenerateColumns="False"
+          CanUserAddRows="False"
+          IsReadOnly="True"
+          SelectionMode="Single"
+          HeadersVisibility="Column"
+          GridLinesVisibility="Horizontal"
+          Background="White"
+          RowHeight="25"
+          BorderThickness="0">
+                                            <DataGrid.ContextMenu>
+                                                <ContextMenu>
+                                                    <MenuItem Header="❌ Delete Selected Row" Click="BtnDeleteHttpRow_Click"/>
+                                                </ContextMenu>
+                                            </DataGrid.ContextMenu>
+                                            <DataGrid.Columns>
+                                                <DataGridTextColumn Header="Time" Binding="{Binding Time}" Width="90"/>
+                                                <DataGridTextColumn Header="Stg" Binding="{Binding Stage}" Width="35" ToolTipService.ToolTip="Stage Index"/>
+
+                                                <DataGridTextColumn Header="Method" Binding="{Binding Method}" Width="70" FontWeight="Bold" Foreground="#2980B9"/>
+                                                <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="60" FontWeight="Bold"/>
+                                                <DataGridTextColumn Header="Ver" Binding="{Binding HttpVersion}" Width="60"/>
+
+                                                <DataGridTextColumn Header="Host" Binding="{Binding Host}" Width="120"/>
+                                                <DataGridTextColumn Header="URI" Binding="{Binding URI}" Width="150">
+                                                    <DataGridTextColumn.ElementStyle>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                                                            <Setter Property="ToolTip" Value="{Binding URI}"/>
+                                                        </Style>
+                                                    </DataGridTextColumn.ElementStyle>
+                                                </DataGridTextColumn>
+
+                                                <DataGridTextColumn Header="Source" Binding="{Binding Source}" Width="130"/>
+                                                <DataGridTextColumn Header="Src Role" Binding="{Binding SourceRole}" Width="70" Foreground="Gray"/>
+
+                                                <DataGridTextColumn Header="Dest" Binding="{Binding Destination}" Width="130"/>
+                                                <DataGridTextColumn Header="Dst Role" Binding="{Binding DestinationRole}" Width="70" Foreground="Gray"/>
+
+                                                <DataGridTextColumn Header="Flags" Binding="{Binding Flags}" Width="80" FontWeight="Bold" Foreground="#E67E22"/>
+                                                <DataGridTextColumn Header="State" Binding="{Binding State}" Width="80" Foreground="Gray"/>
+
+                                                <DataGridTextColumn Header="Info" Binding="{Binding Info}" Width="*">
+                                                    <DataGridTextColumn.ElementStyle>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                                                            <Setter Property="ToolTip" Value="{Binding Info}"/>
+                                                        </Style>
+                                                    </DataGridTextColumn.ElementStyle>
+                                                </DataGridTextColumn>
+                                            </DataGrid.Columns>
+                                        </DataGrid>
+
+                                        <GridSplitter Grid.Row="1" Height="5" HorizontalAlignment="Stretch" Background="#BDC3C7" ShowsPreview="True"/>
+
+                                        <Grid Grid.Row="2" Margin="5">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="1*"/>
+                                                <ColumnDefinition Width="5"/>
+                                                <ColumnDefinition Width="1*"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <GroupBox Grid.Column="0" Header="📑 HTTP Headers" BorderBrush="#9B59B6">
+                                                <TextBox Text="{Binding ElementName=dgHttp, Path=SelectedItem.HttpHeaders, Mode=OneWay}"
+                                 TextWrapping="Wrap"
+                                 AcceptsReturn="True"
+                                 VerticalScrollBarVisibility="Auto"
+                                 IsReadOnly="True"
+                                 FontFamily="Consolas"
+                                 FontSize="12"
+                                 Padding="5"
+                                 BorderThickness="0"/>
+                                            </GroupBox>
+
+                                            <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Center" Background="#BDC3C7"/>
+
+                                            <GroupBox Grid.Column="2" Header="📄 HTTP Body" BorderBrush="#27AE60">
+                                                <TextBox Text="{Binding ElementName=dgHttp, Path=SelectedItem.HttpBody, Mode=OneWay}"
+                                 TextWrapping="Wrap"
+                                 AcceptsReturn="True"
+                                 VerticalScrollBarVisibility="Auto"
+                                 IsReadOnly="True"
+                                 FontFamily="Consolas"
+                                 FontSize="12"
+                                 Padding="5"
+                                 BorderThickness="0"/>
+                                            </GroupBox>
+                                        </Grid>
+                                    </Grid>
+
                                 </Grid>
-                            </ScrollViewer>
+                            </Grid>
                         </TabItem>
+
                     </TabControl>
                 </GroupBox>
             </Grid>
