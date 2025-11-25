@@ -204,7 +204,7 @@ namespace TestKitManagement.Services
                 {
                     foreach (var testStage in _testStages.Values)
                     {
-                        if (testStage.User.Action == ActionKeywords.START_CLIENT)
+                        if (testStage.User.Action == ActionKeywords.START_CLIENT && testStage.User.Stage == _currentStageIndex)
                         {
                             testStage.Client = new Client
                             {
@@ -212,6 +212,10 @@ namespace TestKitManagement.Services
                                 Console = output,
                             };
                             isCaptureClient = true;
+                            OnClientOutputReceived?.Invoke(output);
+                            OnStageUpdated?.Invoke(_currentStageIndex);
+                            OnStagesChanged?.Invoke(_testStages);
+
                             return;
                         }
                     }
@@ -244,7 +248,7 @@ namespace TestKitManagement.Services
                 {
                     foreach (var testStage in _testStages.Values)
                     {
-                        if (testStage.User!.Action.Equals(ActionKeywords.START_SERVER))
+                        if (testStage.User!.Action.Equals(ActionKeywords.START_SERVER) && testStage.User.Stage == _currentStageIndex)
                         {
                             testStage.Server = new Server
                             {
@@ -252,18 +256,22 @@ namespace TestKitManagement.Services
                                 Console = output
                             };
                             isCaptureServer = true;
+
+                            OnClientOutputReceived?.Invoke(output);
+                            OnStageUpdated?.Invoke(_currentStageIndex);
+                            OnStagesChanged?.Invoke(_testStages);
+
+                            return;
                         }
 
                     }
                 }
-                else
-                {
+               
                     currentStage.Server = new Server
                     {
                         Stage = _currentStageIndex,
                         Console = output ?? string.Empty
                     };
-                }
 
             }
             // Notify UI

@@ -1,4 +1,4 @@
-﻿﻿using Common.Helper;
+﻿using Common.Helper;
 using Common.Helper.Kernel32API;
 using Common.Interfaces.IOFile;
 using Common.Interfaces.Services;
@@ -14,6 +14,7 @@ using System.ComponentModel;
 using System.IO;
 using System.Net.WebSockets;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -34,6 +35,9 @@ namespace WpfUI
         private ChildProcess _serverChild;
         private IntPtr _serverMutex;
         private CancellationTokenSource _serverCts;
+
+        private int _actualServerPort = 0;
+        private string _serverExecutableDir = "";
 
         private int _currentStageIndex = 0;
         private readonly string _testCaseName;
@@ -118,7 +122,6 @@ namespace WpfUI
         private bool _isServerRunning = false;
         private bool _isMonitorRunning = false;
         private string _testcasePath = string.Empty;
-        private string _portNetwork = string.Empty;
         private IOFileHandler _fileHandler;
         private readonly ITestkitManagerService _testkitManagerService;
         private PacketCaptureService _serviceMonitor;
@@ -133,7 +136,6 @@ namespace WpfUI
             IProcessManager processManager, IOFileHandler fileHandler,
             ITestkitManagerService testkitManagerService)
         {
-            LogManager.Instance.LogDebug($"RecorderWindow ctor: this={this.GetHashCode()} - creating TestStages (initial count: {TestStages.Count})");
             InitializeComponent();
 
             _testcasePath = testcasePath;
@@ -156,20 +158,13 @@ namespace WpfUI
         }
         public async Task<bool> InitializeAsync()
         {
-            //var (proxyPort, serverPort) = PortChecker.GetTwoAvailablePorts(8000, 9000);
-
-            //if (!AppSettingsManager.UpdateAppSettings(_clientPath, proxyPort, _serverPath, serverPort))
-            //{
-            //    MessageBox.Show("Failed to update appsettings.json. Check log for details.", "Error",
-            //        MessageBoxButton.OK, MessageBoxImage.Error);
-            //    return false;
-            //}
+            _serverExecutableDir = Path.GetDirectoryName(_serverPath);
 
             var protocol = Settings.Default.Protocol;
             _serviceMonitor = new PacketCaptureService(_testkitManagerService,protocol);
             var devices = SharpPcap.CaptureDeviceList.Instance;
 
-
+            _actualServerPort = await ReadServerActualPortAsync();
             if (devices.Count == 0)
             {
                 return false;
@@ -179,7 +174,7 @@ namespace WpfUI
                     d.Description != null &&
                     d.Description.ToLower().Contains("loopback"));
 
-            // Nếu không tìm thấy Loopback, mới đành lấy cái đầu tiên (Fallback)
+            //Not Found Loopback, => (Fallback)
             if (_device == null)
             {
                 _device = devices.First();
@@ -292,6 +287,116 @@ namespace WpfUI
             });
         }
 
+        #endregion
+
+        #region Helper Methods - Port Reading
+
+        private async Task<int> ReadServerActualPortAsync()
+        {
+            var appSettingsFile = Path.Combine(_serverExecutableDir, "appsettings.json");
+
+            LogManager.Instance?.LogInfomation($"📂 Looking for appsettings.json: {appSettingsFile}");
+
+            int fileRetries = 0;
+            while (!File.Exists(appSettingsFile) && fileRetries < 50)
+            {
+                await Task.Delay(100);
+                fileRetries++;
+            }
+
+            if (!File.Exists(appSettingsFile))
+            {
+                LogManager.Instance?.LogError($"❌ Could not find appsettings.json: {appSettingsFile}");
+            }
+
+            try
+            {
+                int parseRetries = 0;
+                int port = -1;
+
+                while (parseRetries < 5)
+                {
+                    try
+                    {
+                        await Task.Delay(200);
+
+                        string jsonContent;
+                        using (var fileStream = new FileStream(appSettingsFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                        using (var reader = new StreamReader(fileStream))
+                        {
+                            jsonContent = await reader.ReadToEndAsync();
+                        }
+
+                        LogManager.Instance?.LogDebug($"📄 appsettings.json content:\n{jsonContent}");
+
+                        using (JsonDocument doc = JsonDocument.Parse(jsonContent))
+                        {
+                            JsonElement root = doc.RootElement;
+
+                            if (root.TryGetProperty("Port", out JsonElement portElement))
+                            {
+                                string portText = portElement.GetString();
+
+                                if (int.TryParse(portText, out port))
+                                {
+                                    if (port > 0 && port < 65536)
+                                    {
+                                        LogManager.Instance?.LogInfomation($"✅ Server port read from appsettings.json: {port}");
+                                        return port;
+                                    }
+                                    else
+                                    {
+                                        LogManager.Instance?.LogWarning($"⚠️ Invalid port range: {port}, retrying...");
+                                        parseRetries++;
+                                        continue;
+                                    }
+                                }
+                                else
+                                {
+                                    LogManager.Instance?.LogWarning($"⚠️ Could not parse port: {portText}, retrying...");
+                                    parseRetries++;
+                                    continue;
+                                }
+                            }
+                            else
+                            {
+                                LogManager.Instance?.LogWarning($"⚠️ 'Port' field not found, retrying...");
+                                parseRetries++;
+                                continue;
+                            }
+                        }
+                    }
+                    catch (JsonException ex)
+                    {
+                        LogManager.Instance?.LogWarning($"⚠️ Error parsing JSON (attempt {parseRetries + 1}/5): {ex.Message}");
+                        parseRetries++;
+                        await Task.Delay(300);
+                        continue;
+                    }
+                    catch (IOException ex)
+                    {
+                        LogManager.Instance?.LogWarning($"⚠️ File is locked or being written (attempt {parseRetries + 1}/5): {ex.Message}");
+                        parseRetries++;
+                        await Task.Delay(300);
+                        continue;
+                    }
+                }
+
+                // Nếu vẫn không đọc được sau 5 lần retry
+                if (port <= 0 || port >= 65536)
+                {
+                    LogManager.Instance?.LogError($"❌ Failed to read valid port after {parseRetries} attempts");
+                }
+
+                return port;
+            }
+            catch (Exception ex)
+            {
+                LogManager.Instance?.LogError($"❌ Error reading port from appsettings.json: {ex.Message}");
+                LogManager.Instance?.LogError($"Stack trace: {ex.StackTrace}");
+                throw;
+            }
+        }
         #endregion
 
         #region Event Handlers - Network monitor
@@ -543,18 +648,6 @@ namespace WpfUI
                 }
                 catch { }
                 base.OnClosing(e);
-                return;
-            }
-            e.Cancel = true;
-            var result = MessageBox.Show(
-                "Stop recording and close?\n\nAll processes will be terminated.",
-                "Confirm Close",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Question);
-
-            if (result == MessageBoxResult.No)
-            {
-                e.Cancel = true;
                 return;
             }
 
@@ -913,7 +1006,7 @@ namespace WpfUI
                 if (!_isMonitorRunning)
                 {
                     var startupSignal = new TaskCompletionSource<bool>();
-                    Task monitorTask = _serviceMonitor.StartCaptureAsync(_device, "8000", "", _ctsMonitor, startupSignal);
+                    Task monitorTask = _serviceMonitor.StartCaptureAsync(_device, _actualServerPort.ToString(), "", _ctsMonitor, startupSignal);
                     await startupSignal.Task;
                     _isMonitorRunning = true;
                 }
@@ -933,7 +1026,7 @@ namespace WpfUI
                 _isClientRunning = true;
 
                 UpdateProcessButtonStates();
-                
+
             }
             catch (Exception ex)
             {
@@ -1001,7 +1094,7 @@ namespace WpfUI
                 if (!_isMonitorRunning)
                 {
                     var startupSignal = new TaskCompletionSource<bool>();
-                    Task monitorTask = _serviceMonitor.StartCaptureAsync(_device, "8000", "", _ctsMonitor, startupSignal);
+                    Task monitorTask = _serviceMonitor.StartCaptureAsync(_device, _actualServerPort.ToString(), "", _ctsMonitor, startupSignal);
                     await startupSignal.Task;
                     _isMonitorRunning = true;
                 }
@@ -1016,6 +1109,7 @@ namespace WpfUI
                 BtnStartServer.IsEnabled = true;
             }
         }
+
 
         public async Task CleanupAsync()
         {
