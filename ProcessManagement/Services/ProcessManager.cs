@@ -396,7 +396,6 @@ namespace ProcessManagement.Services
                 if (showConsoleMessages)
                 {
                     _consoleManager.Alloc();
-                    Console.WriteLine($"Tiến trình {child.name} đã thoát.");
                     _consoleManager.Free();
                 }
             }
