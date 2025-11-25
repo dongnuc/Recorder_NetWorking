@@ -11,6 +11,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 using System.Windows;
 using System.Windows.Data;
 using static Common.Models.Entities.MiddlewareModel;
@@ -30,6 +31,10 @@ namespace WpfUI
         private ChildProcess _serverChild;
         private IntPtr _serverMutex;
         private CancellationTokenSource _serverCts;
+
+        // ✅ THÊM: Fields để lưu port thực tế
+        private int _actualServerPort = 0;
+        private string _serverExecutableDir = "";
 
         private int _currentStageIndex = 0;
         private readonly string _testCaseName;
@@ -147,20 +152,31 @@ namespace WpfUI
         {
             this.DataContext = null;
         }
+
+        /// <summary>
+        /// ✅ SỬA: InitializeAsync() - KHÔNG CẦN GỌI AppSettingsManager.UpdateAppSettings
+        /// </summary>
         public async Task InitializeAsync()
         {
-            var (proxyPort, serverPort) = PortChecker.GetTwoAvailablePorts(8000, 9000);
-
-            if (!AppSettingsManager.UpdateAppSettings(_clientPath, proxyPort, _serverPath, serverPort))
+            try
             {
-                MessageBox.Show("Failed to update appsettings.json. Check log for details.", "Error",
-                    MessageBoxButton.OK, MessageBoxImage.Error);
-                return;
+                // ✅ Lưu folder của server exe để sau này đọc port file
+                _serverExecutableDir = Path.GetDirectoryName(_serverPath);
+                LogManager.Instance?.LogInfomation($"📂 Server directory: {_serverExecutableDir}");
+
+                // ✅ KHÔNG CẦN allocate port nữa, server sẽ tự dùng port từ appsettings
+                // var (proxyPort, serverPort) = PortChecker.GetTwoAvailablePorts(8000, 9000);
+                // if (!AppSettingsManager.UpdateAppSettings(_clientPath, proxyPort, _serverPath, serverPort))
+                // {...}
+
+                await Task.Delay(500);
+                LogManager.Instance?.LogInfomation("✅ RecorderWindow initialized - Ready to start processes");
             }
-
-            _proxyPort = proxyPort; _serverPort = serverPort;
-
-            await Task.Delay(500);
+            catch (Exception ex)
+            {
+                LogManager.Instance?.LogError($"❌ Error initializing RecorderWindow: {ex.Message}");
+                throw;
+            }
         }
 
         #endregion
@@ -266,6 +282,127 @@ namespace WpfUI
                 OnPropertyChanged(nameof(SelectedStageData));
                 OnPropertyChanged(nameof(TestStages));
             });
+        }
+
+        #endregion
+
+        #region Helper Methods - Port Reading
+
+        // ✅ SỬA: Đọc port từ appsettings.json của server với retry logic
+        private async Task<int> ReadServerActualPortAsync()
+        {
+            var appSettingsFile = Path.Combine(_serverExecutableDir, "appsettings.json");
+
+            LogManager.Instance?.LogInfomation($"📂 Looking for appsettings.json: {appSettingsFile}");
+
+            // Chờ file tồn tại - tối đa 50 lần x 100ms = 5 giây
+            int fileRetries = 0;
+            while (!File.Exists(appSettingsFile) && fileRetries < 50)
+            {
+                await Task.Delay(100);
+                fileRetries++;
+            }
+
+            if (!File.Exists(appSettingsFile))
+            {
+                LogManager.Instance?.LogError($"❌ Could not find appsettings.json: {appSettingsFile}");
+                throw new FileNotFoundException($"appsettings.json not found: {appSettingsFile}");
+            }
+
+            LogManager.Instance?.LogInfomation($"✅ Found appsettings.json, now reading port...");
+
+            try
+            {
+                // Retry logic - đôi khi file vừa được ghi, chưa kịp flush
+                int parseRetries = 0;
+                int port = -1;
+
+                while (parseRetries < 5)
+                {
+                    try
+                    {
+                        // Thêm delay nhỏ trước khi đọc để file flush dữ liệu
+                        await Task.Delay(200);
+
+                        // Đọc file JSON với FileShare.Read để cho phép file bị lock
+                        string jsonContent;
+                        using (var fileStream = new FileStream(appSettingsFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                        using (var reader = new StreamReader(fileStream))
+                        {
+                            jsonContent = await reader.ReadToEndAsync();
+                        }
+
+                        LogManager.Instance?.LogDebug($"📄 appsettings.json content:\n{jsonContent}");
+
+                        // Parse JSON để lấy Port
+                        using (JsonDocument doc = JsonDocument.Parse(jsonContent))
+                        {
+                            JsonElement root = doc.RootElement;
+
+                            if (root.TryGetProperty("Port", out JsonElement portElement))
+                            {
+                                string portText = portElement.GetString();
+
+                                if (int.TryParse(portText, out port))
+                                {
+                                    if (port > 0 && port < 65536)
+                                    {
+                                        LogManager.Instance?.LogInfomation($"✅ Server port read from appsettings.json: {port}");
+                                        return port;
+                                    }
+                                    else
+                                    {
+                                        LogManager.Instance?.LogWarning($"⚠️ Invalid port range: {port}, retrying...");
+                                        parseRetries++;
+                                        continue;
+                                    }
+                                }
+                                else
+                                {
+                                    LogManager.Instance?.LogWarning($"⚠️ Could not parse port: {portText}, retrying...");
+                                    parseRetries++;
+                                    continue;
+                                }
+                            }
+                            else
+                            {
+                                LogManager.Instance?.LogWarning($"⚠️ 'Port' field not found, retrying...");
+                                parseRetries++;
+                                continue;
+                            }
+                        }
+                    }
+                    catch (JsonException ex)
+                    {
+                        LogManager.Instance?.LogWarning($"⚠️ Error parsing JSON (attempt {parseRetries + 1}/5): {ex.Message}");
+                        parseRetries++;
+                        await Task.Delay(300);
+                        continue;
+                    }
+                    catch (IOException ex)
+                    {
+                        LogManager.Instance?.LogWarning($"⚠️ File is locked or being written (attempt {parseRetries + 1}/5): {ex.Message}");
+                        parseRetries++;
+                        await Task.Delay(300);
+                        continue;
+                    }
+                }
+
+                // Nếu vẫn không đọc được sau 5 lần retry
+                if (port <= 0 || port >= 65536)
+                {
+                    LogManager.Instance?.LogError($"❌ Failed to read valid port after {parseRetries} attempts");
+                    throw new InvalidOperationException($"Could not read valid port from appsettings.json after {parseRetries} retry attempts");
+                }
+
+                return port;
+            }
+            catch (Exception ex)
+            {
+                LogManager.Instance?.LogError($"❌ Error reading port from appsettings.json: {ex.Message}");
+                LogManager.Instance?.LogError($"Stack trace: {ex.StackTrace}");
+                throw;
+            }
         }
 
         #endregion
@@ -472,21 +609,22 @@ namespace WpfUI
                 base.OnClosing(e);
                 return;
             }
-            //e.Cancel = true;
-            //var result = MessageBox.Show(
-            //    "Stop recording and close?\n\nAll processes will be terminated.",
-            //    "Confirm Close",
-            //    MessageBoxButton.YesNo,
-            //    MessageBoxImage.Question);
+            e.Cancel = true;
+            var result = MessageBox.Show(
+                "Stop recording and close?\n\nAll processes will be terminated.",
+                "Confirm Close",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
 
-            //if (result == MessageBoxResult.No)
-            //{
-            //    e.Cancel = true;
-            //    return;
-            //}
+            if (result == MessageBoxResult.No)
+            {
+                e.Cancel = true;
+                return;
+            }
 
             try
             {
+                LogManager.Instance.LogInfomation("Closing RecorderWindow - stopping all processes...");
                 this.IsEnabled = false;
                 _isClosing = true;
                 await CleanupAsync();
@@ -520,6 +658,7 @@ namespace WpfUI
                     return;
                 }
 
+                LogManager.Instance.LogInfomation("Stopping Client process...");
 
                 if (_clientCts != null)
                 {
@@ -593,6 +732,7 @@ namespace WpfUI
                     LogManager.Instance.LogWarning("⚠️ Server process already closed");
                     return;
                 }
+                LogManager.Instance.LogInfomation("Stopping Server process...");
 
                 if (_serverCts != null)
                 {
@@ -820,13 +960,20 @@ namespace WpfUI
         {
             if (_isClientRunning)
             {
-                MessageBox.Show("Server is already running.", "Info", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show("Client is already running.", "Info", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
             if (!File.Exists(_clientPath))
             {
                 throw new FileNotFoundException($"Client executable not found: {_clientPath}");
+            }
+
+            // ✅ Kiểm tra server port
+            if (_actualServerPort == 0)
+            {
+                MessageBox.Show("❌ Server port not available.\n\nPlease start the Server first!", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
             }
 
             if (_clientMutex != IntPtr.Zero && _clientCts != null)
@@ -851,14 +998,20 @@ namespace WpfUI
                 {
                     _currentStageIndex = 1;
                 }
-                if (!_isMiddlewareRunning && _isServerRunning)
-                {
-                    LogManager.Instance.LogInfomation("Starting middleware...");
-                    await MiddlewareStart.Instance.StartAsync(_proxyPort, _serverPort, _isHttp);
-                    _isMiddlewareRunning = true;
-                }
+
+                // ❌ XÓA: Không khởi động middleware
+                // if (!_isMiddlewareRunning && _isServerRunning)
+                // {
+                //     LogManager.Instance.LogInfomation("Starting middleware...");
+                //     await MiddlewareStart.Instance.StartAsync(_proxyPort, _serverPort, _isHttp);
+                //     _isMiddlewareRunning = true;
+                // }
+
                 BtnStartClient.IsEnabled = false;
                 _testkitManagerService.CreateInitialStage(ActionKeywords.START_CLIENT);
+
+                // ✅ Client kết nối trực tiếp tới server (KHÔNG QUA MIDDLEWARE)
+                LogManager.Instance?.LogInfomation($"🚀 Starting client - connecting directly to server on port {_actualServerPort}");
 
                 var clientResult = await _processManager.StartSingleWithPollingAsync(
                     _clientPath,
@@ -867,16 +1020,18 @@ namespace WpfUI
                     showConsoleMessages: false
                 );
 
-                //  ASSIGN to fields
                 _clientChild = clientResult.child;
                 _clientMutex = clientResult.mutex;
                 _clientCts = clientResult.cts;
 
                 _isClientRunning = true;
                 UpdateProcessButtonStates();
+
+                LogManager.Instance?.LogInfomation($"✅ Client started - connected directly to server on port {_actualServerPort}");
             }
             catch (Exception ex)
             {
+                LogManager.Instance.LogError($"❌ Error starting client: {ex.Message}");
             }
             finally
             {
@@ -921,15 +1076,20 @@ namespace WpfUI
                     _currentStageIndex = 1;
                 }
 
-                if (!_isMiddlewareRunning && _isClientRunning)
-                {
-                    LogManager.Instance.LogInfomation("Starting middleware...");
-                    await MiddlewareStart.Instance.StartAsync(_proxyPort, _serverPort, _isHttp);
-                    _isMiddlewareRunning = true;
-                }
+                // ❌ XÓA: Không khởi động middleware
+                // if (!_isMiddlewareRunning && _isClientRunning)
+                // {
+                //     LogManager.Instance.LogInfomation("Starting middleware...");
+                //     await MiddlewareStart.Instance.StartAsync(_proxyPort, _serverPort, _isHttp);
+                //     _isMiddlewareRunning = true;
+                // }
+
                 _testkitManagerService.CreateInitialStage(ActionKeywords.START_SERVER);
 
                 BtnStartServer.IsEnabled = false;
+
+                // ✅ Khởi động server
+                LogManager.Instance?.LogInfomation("🚀 Starting server process...");
                 var serverResult = await _processManager.StartSingleWithPollingAsync(
                     _serverPath,
                     "Server",
@@ -942,12 +1102,30 @@ namespace WpfUI
                 _serverCts = serverResult.cts;
 
                 _isServerRunning = true;
+
+                // ✅ Chờ server khởi động hoàn toàn
+                LogManager.Instance?.LogInfomation("⏳ Waiting for server to fully initialize...");
+                await Task.Delay(2000);
+
+                // ✅ Đọc port thực tế từ appsettings.json
+                try
+                {
+                    _actualServerPort = await ReadServerActualPortAsync();
+                    LogManager.Instance?.LogInfomation($"🔌 Server running on actual port: {_actualServerPort}");
+                }
+                catch (Exception ex)
+                {
+                    LogManager.Instance?.LogError($"❌ Failed to read server port: {ex.Message}");
+                    MessageBox.Show($"Warning: Could not read server port.\n\n{ex.Message}", "Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+
                 UpdateProcessButtonStates();
                 await Task.Delay(1000);
             }
             catch (Exception ex)
             {
-                LogManager.Instance.LogError($"Error starting server: {ex.Message}");
+                LogManager.Instance.LogError($"❌ Error starting server: {ex.Message}");
+                MessageBox.Show($"Error starting server: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
             finally
             {
@@ -959,6 +1137,7 @@ namespace WpfUI
         {
             try
             {
+                LogManager.Instance?.LogInfomation("🛑 Cleaning up RecorderWindow resources...");
 
                 // Unsubscribe from events FIRST
                 UnsubscribeFromDataSources();
@@ -1026,6 +1205,7 @@ namespace WpfUI
                     LogManager.Instance?.LogWarning($"ProcessManager dispose failed: {ex.Message}");
                 }
 
+                LogManager.Instance?.LogInfomation(" RecorderWindow cleanup completed");
             }
             catch (Exception ex)
             {
