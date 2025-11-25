@@ -99,7 +99,7 @@ namespace FileManagement.FolderHelper
             }
         }
 
-        public void ReplaceSheetExcel(string srcPath, string desPath)
+        public void ReplaceSheetExcel(string srcPath, string desPath, string sheetName)
         {
             var srcFile = new FileInfo(srcPath);
             var desFile = new FileInfo(desPath);
@@ -107,20 +107,20 @@ namespace FileManagement.FolderHelper
             using (var srcPackage = new ExcelPackage(srcFile))
             using (var desPackage = new ExcelPackage(desFile))
             {
-                var srcSheet = srcPackage.Workbook.Worksheets["Run"];
+                var srcSheet = srcPackage.Workbook.Worksheets[sheetName];
 
                 if (srcSheet == null)
                 {
-                    throw new Exception($"Sheet 'Run' not found in the source template file: {srcPath}");
+                    throw new Exception($"Sheet ${sheetName} not found in the source template file: {srcPath}");
                 }
 
-                var desSheet = desPackage.Workbook.Worksheets["Run"];
+                var desSheet = desPackage.Workbook.Worksheets[sheetName];
                 if (desSheet != null)
                 {
                     desPackage.Workbook.Worksheets.Delete(desSheet);
                 }
 
-                desPackage.Workbook.Worksheets.Add("Run", srcSheet);
+                desPackage.Workbook.Worksheets.Add(sheetName, srcSheet);
 
                 desPackage.Save();
             }

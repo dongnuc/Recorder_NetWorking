@@ -13,7 +13,7 @@ namespace Common.Interfaces.IOFile
         void Copy(string sourcePath, string destinationPath, bool overwrite);
         void DeleteFileOrFolder(string path);
         void OpenFolderInExplorer(string path);
-        void ReplaceSheetExcel(string srcPath, string desPath);
+        void ReplaceSheetExcel(string srcPath, string desPath, string sheetName);
         bool SearchFiles(string folderPath, string searchString);
         List<string> SearchAllFolderPathInFolder(string bigFolderPath);
     }

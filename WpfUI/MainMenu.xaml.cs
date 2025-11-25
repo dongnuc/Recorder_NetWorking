@@ -32,7 +32,6 @@ namespace WpfUI
         private IOFileHandler _fileHandler;
         private readonly IServiceProvider _serviceProvider;
 
-        // Constructor 4 tham số
         public MainMenu(MainMenuViewModel viewModel,
             IOFileHandler fileHandler,
             IServiceProvider serviceProvider,
@@ -72,17 +71,11 @@ namespace WpfUI
             }
         }
 
-        // HÀM MỚI (Cho nút ⚙️ Config)
         private void BtnConfig_Click(object sender, RoutedEventArgs e)
         {
             var dialog = new ConfigWindow();
             dialog.Owner = this;
-
-            if (dialog.ShowDialog() == true)
-            {
-                // Nếu người dùng nhấn "Save", bảo ViewModel cập nhật TẤT CẢ các file Excel
-                _viewModel.UpdateAllQuestionConfigs();
-            }
+            dialog.ShowDialog();
         }
 
         private void TreeViewItem_ContextMenuOpening(object sender, ContextMenuEventArgs e)
@@ -278,6 +271,8 @@ namespace WpfUI
 
         private void CloseTab_Click(object sender, RoutedEventArgs e)
         {
+            if (Application.Current == null || Application.Current.MainWindow == null) return;
+            if (!this.IsLoaded) return;
             var button = sender as Button;
             if (button?.Tag is TabItem tabItem && tabItem.Tag is Guid tabId)
             {
@@ -303,14 +298,10 @@ namespace WpfUI
             {
                 if (_activeTabs.TryGetValue(id, out var tabData))
                 {
-                    LogManager.Instance?.LogInfomation($" Closing tab: {tabData.TestCaseName} (ID: {id})");
-                    // (Sửa lỗi: Xóa dòng lặp)
-                    // await tabData.RecorderWindow.CleanupAsync(); 
                     if (tabData.RecorderWindow != null)
                     {
                         try
                         {
-                            LogManager.Instance?.LogDebug("Calling RecorderWindow.CleanupAsync()");
                             await tabData.RecorderWindow.CleanupAsync();
                             LogManager.Instance?.LogDebug("RecorderWindow cleanup completed");
                         }

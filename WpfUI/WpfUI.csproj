@@ -61,6 +61,12 @@
     <None Update="Resources\Templates\DotnetNetworking\Question\Header.xlsx">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+    <None Update="Resources\Templates\DotnetNetworking\Question\NetworkHTTP.xlsx">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Resources\Templates\DotnetNetworking\Question\NetworkTCP.xlsx">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Update="Resources\Templates\DotnetNetworking\TestCase\Detail.xlsx">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
@@ -74,6 +80,12 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <None Update="Resources\Templates\DotnetNetworking\TestCase\Header.xlsx">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Resources\Templates\DotnetNetworking\TestCase\NetworkHTTP.xlsx">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Resources\Templates\DotnetNetworking\TestCase\NetworkTCP.xlsx">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
 	  <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />

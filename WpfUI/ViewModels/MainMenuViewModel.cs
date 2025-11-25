@@ -8,7 +8,7 @@ using System.Windows;
 using System;
 using WpfUI.Properties;
 using System.Collections.Generic;
-using OfficeOpenXml; // (Dùng để sửa lỗi File Locking)
+using OfficeOpenXml; 
 using System.Threading.Tasks;
 
 namespace WpfUI.ViewModels
@@ -125,15 +125,25 @@ namespace WpfUI.ViewModels
                     throw new Exception($"Template file {chosenEnvRunFile} not found in '.../Templates/DotnetNetworking/Question'. \nPlease check 'Copy to Output Directory'.");
                 }
 
-                _folderHandler.ReplaceSheetExcel(srcSheetPath, destEnvPath);
+                _folderHandler.ReplaceSheetExcel(srcSheetPath, destEnvPath, "Run");
 
                 string metaPath = _folderHandler.CreateDirectory(questionPath, "Meta");
                 string givenPath = _folderHandler.CreateDirectory(metaPath, "Given");
                 _folderHandler.CreateDirectory(givenPath, "Client");
                 _folderHandler.CreateDirectory(givenPath, "Server");
-
+                string headerPath = Path.Combine(questionPath, "Header.xlsx");
+                string protocol = Settings.Default.Protocol;
+                try
+                {
+                    _fileHandler.ModifyExcelCellContent(headerPath, "Config", 3, 2, protocol);
+                    LogManager.Instance.LogInfomation($"Set Protocol={protocol} for {questionName}");
+                }
+                catch (Exception ex)
+                {
+                    LogManager.Instance.LogWarning($"Could not set Protocol in Header.xlsx: {ex.Message}");
+                }
                 LoadFileTree();
-                LogManager.Instance.LogInfomation($"✅ Created new question: {questionName}. UseDatabase={useDatabase}");
+                LogManager.Instance.LogInfomation($"Created new question: {questionName}. UseDatabase={useDatabase}");
             }
             catch (Exception ex)
             {
@@ -163,6 +173,26 @@ namespace WpfUI.ViewModels
 
                 _folderHandler.CopyTemplateFromResource(testCasePath, _testCaseTemplateDir, false,
                     "Header.xlsx", "Environment.xlsx", "Detail.xlsx");
+
+                string protocol = Settings.Default.Protocol;
+                string networkSourceFile = (protocol == "TCP") ? "NetworkTCP.xlsx" : "NetworkHTTP.xlsx";
+                string networkSourcePath = Path.Combine(_testCaseTemplateDir, networkSourceFile);
+                string detailDestPath = Path.Combine(testCasePath, "Detail.xlsx");
+                if (File.Exists(networkSourcePath) && File.Exists(detailDestPath))
+                {
+                    try
+                    {
+                        _folderHandler.ReplaceSheetExcel(networkSourcePath, detailDestPath, "Network");
+                    }
+                    catch (Exception ex)
+                    {
+                        LogManager.Instance.LogError($"Failed to apply Network template: {ex.Message}");
+                    }
+                }
+                else
+                {
+                    LogManager.Instance.LogWarning($"Network template {networkSourceFile} not found.");
+                }
 
                 bool useDatabase = false;
                 try
@@ -195,7 +225,8 @@ namespace WpfUI.ViewModels
                     throw new Exception($"Template file {chosenEnvRunFile} not found in '.../Templates/DotnetNetworking/TestCase'. \nPlease check 'Copy to Output Directory'.");
                 }
 
-                _folderHandler.ReplaceSheetExcel(srcSheetPath, destEnvPath);
+                _folderHandler.ReplaceSheetExcel(srcSheetPath, destEnvPath,"Run");
+
                 String metaPath =_folderHandler.CreateDirectory(testCasePath, "Meta");
                 string givenPath = _folderHandler.CreateDirectory(metaPath, "Given");
                 _folderHandler.CreateDirectory(givenPath, "Client");
@@ -204,7 +235,6 @@ namespace WpfUI.ViewModels
                 {
                     string parentHeaderPath = Path.Combine(SelectedItem.FullPath, "Header.xlsx");
 
-                    LogManager.Instance.LogInfomation($"Appending '{testCaseName}' to Header file: {parentHeaderPath}...");
 
                     await _fileHandler.AppendNewRow(parentHeaderPath, "TestSuite", testCaseName, string.Empty);
 
@@ -255,7 +285,6 @@ namespace WpfUI.ViewModels
                         string parentHeaderPath = Path.Combine(parentPath, "Header.xlsx");
                         string testCaseName = SelectedItem.Name;
 
-                        LogManager.Instance.LogInfomation($"Deleting TestCase. Removing '{testCaseName}' from {parentHeaderPath}...");
 
                         try
                         {
@@ -299,42 +328,6 @@ namespace WpfUI.ViewModels
             }
         }
 
-        public async void UpdateAllQuestionConfigs()
-        {
-            string newProtocol = Settings.Default.Protocol;
-            LogManager.Instance.LogInfomation($"Starting to update all Question configs to '{newProtocol}'...");
-
-            try
-            {
-                await Task.Run(() =>
-                {
-                    var questionFolders = Directory.GetDirectories(_projectPath);
-
-                    foreach (var folderPath in questionFolders)
-                    {
-                        string headerPath = Path.Combine(folderPath, "Header.xlsx");
-                        if (File.Exists(headerPath))
-                        {
-                            try
-                            {
-                                _fileHandler.ModifyExcelCellContent(headerPath, "Config", 3, 2, newProtocol);
-                                LogManager.Instance.LogInfomation($"Updated config for: {Path.GetFileName(folderPath)}");
-                            }
-                            catch (Exception ex)
-                            {
-                                LogManager.Instance.LogWarning($"Failed to update {headerPath}. Error: {ex.Message}");
-                            }
-                        }
-                    }
-                });
-            }
-            catch (Exception ex)
-            {
-                LogManager.Instance.LogError($"General error in UpdateAllQuestionConfigs: {ex.Message}");
-            }
-
-            LogManager.Instance.LogInfomation("Finished updating all Question configs.");
-        }
 
         #endregion
 
