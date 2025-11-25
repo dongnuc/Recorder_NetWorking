@@ -9,7 +9,6 @@ using System.Collections.Concurrent;
 
 namespace ProcessManagement.Services
 {
-
     public class ProcessManager : IProcessManager
     {
         #region Fields
@@ -74,7 +73,7 @@ namespace ProcessManagement.Services
 
             await Task.Delay(3000);
 
-            //  Capture INITIAL output (lần đầu tiên)
+            //  Capture INITIAL output (lần đầu tiên) 
             //await CaptureAndRaiseInitialOutputAsync(child, mutex, name, isClient);
 
             // Start Enter key monitoring (chỉ cho client)
@@ -228,7 +227,6 @@ namespace ProcessManagement.Services
             try
             {
                 //Capture BEFORE
-                LogManager.Instance.LogDebug($" 1: Capturing BEFORE snapshot");
                 string bufferBefore = "";
                 if (_previousSnapshots.ContainsKey(processName))
                 {
@@ -238,7 +236,6 @@ namespace ProcessManagement.Services
 
 
                 // Capture AFTER 
-                LogManager.Instance.LogDebug($" 3: Capturing AFTER snapshot (with input)");
                 string bufferAfterInput = await _consolePoller.CaptureCurrentConsoleAsync(
                     child,
                     mutex,
@@ -246,7 +243,6 @@ namespace ProcessManagement.Services
                 );
 
                 // Extract input value
-                LogManager.Instance.LogDebug($"4: Extracting input value");
                 string extractedCapture = DataInspector.ExtractDifference(
                     bufferBefore,
                     bufferAfterInput
@@ -265,17 +261,19 @@ namespace ProcessManagement.Services
                     else
                     {
                         var (input, outputClient) = DataInspector.SplitInputFromOutput(extractedCapture);
-                        if (input != null && !string.IsNullOrWhiteSpace(input))
+                        if(!string.IsNullOrEmpty(outputClient))
                         {
-                            _testkitManagerService.ReceiveUserInput(input, ActionKeywords.INPUT);
+                            if (input != null && !string.IsNullOrWhiteSpace(input))
+                            {
+                                _testkitManagerService.ReceiveUserInput(input, ActionKeywords.INPUT);
+                            }
+                            else
+                            {
+                                _testkitManagerService.ReceiveUserInput("", "UserInput");
+                                LogManager.Instance.LogWarning($"Input is null");
+                            }
+                            _testkitManagerService.ReceiveClientOutput(outputClient);
                         }
-                        else
-                        {
-                            _testkitManagerService.ReceiveUserInput("", "UserInput");
-                            LogManager.Instance.LogWarning($"Input is null");
-                        }
-                        LogManager.Instance.LogDebug($" STEP 5: Raising OnUserInput event");
-                        _testkitManagerService.ReceiveClientOutput(outputClient);
                     }
                 }
                 else
@@ -313,10 +311,6 @@ namespace ProcessManagement.Services
                             LogManager.Instance.LogError($" Failed to auto-capture Server: {ex.Message}");
                         }
                     }
-                }
-                else
-                {
-                    LogManager.Instance.LogWarning($" Server process not found for auto-capture");
                 }
             }
             catch (Exception ex)
@@ -360,7 +354,6 @@ namespace ProcessManagement.Services
                 if (showConsoleMessages)
                 {
                     _consoleManager.Alloc();
-                    Console.WriteLine("Đường dẫn EXE không hợp lệ.");
                     _consoleManager.Free();
                 }
                 throw new FileNotFoundException($"Executable not found: {exePath}");
@@ -373,8 +366,6 @@ namespace ProcessManagement.Services
             if (showConsoleMessages)
             {
                 _consoleManager.Alloc();
-                Console.WriteLine($"Đã khởi động ứng dụng console {name} với cửa sổ riêng.");
-                Console.WriteLine("Tương tác trực tiếp với nó trong cửa sổ console tương ứng.");
                 _consoleManager.Free();
             }
 
@@ -396,7 +387,6 @@ namespace ProcessManagement.Services
                 if (showConsoleMessages)
                 {
                     _consoleManager.Alloc();
-                    Console.WriteLine($"Tiến trình {child.name} đã thoát.");
                     _consoleManager.Free();
                 }
             }
@@ -496,6 +486,7 @@ namespace ProcessManagement.Services
             await Task.CompletedTask;
         }
 
+        // not using
         public async Task CaptureSnapshotOnlyAsync(ChildProcess child, nint mutex, string processName)
         {
             try
@@ -531,5 +522,3 @@ namespace ProcessManagement.Services
         #endregion
     }
 }
-
-

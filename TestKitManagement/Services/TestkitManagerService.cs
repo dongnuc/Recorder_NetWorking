@@ -2,8 +2,8 @@
 using Common.Logging;
 using Common.Models.Entities;
 using Common.Resources;
-using Middleware.Services;
-using static Common.Models.Entities.MiddlewareModel;
+using NetworkMonitor.Models;
+using System.Collections.ObjectModel;
 
 namespace TestKitManagement.Services
 {
@@ -13,7 +13,9 @@ namespace TestKitManagement.Services
         #region Fields
         private readonly Dictionary<int, TestStage> _testStages = new();
         private int _currentStageIndex = 0;
-        private readonly Queue<NetworkTransaction> _pendingTransactions = new();
+        private readonly Queue<HttpNetworkFlow> _pendingHttpNetwork = new();
+        private readonly Queue<TcpNetworkFlow> _pendingTcpNetwork = new();
+
         private readonly object _lock = new object();
         private string _testCaseName;
         #endregion
@@ -21,13 +23,15 @@ namespace TestKitManagement.Services
         public event Action<string, string> OnUserInputReceived;
         public event Action<string> OnClientOutputReceived;
         public event Action<string> OnServerOutputReceived;
-        public event Action<MiddlewareModel.NetworkTransaction> OnTransactionReceived;
         public event Action<Dictionary<int, TestStage>> OnStagesChanged;
         public event Action<int> OnStageCreated;
         public event Action<int> OnStageUpdated;
         public bool isCaptureClient = false;
         public bool isCaptureServer = false;
 
+        public event Action<int, HttpNetworkFlow> OnNewHttpFlow;
+        public event Action<int, TcpNetworkFlow> OnNewTcpFlow;
+        public event Action<int> OnQueueCountChanged;
         #region Method Helper
         private TestStage CreateNewStage(int stageIndex, string input)
         {
@@ -54,126 +58,86 @@ namespace TestKitManagement.Services
             return stage;
         }
 
-        private void ProcessTransactionWithoutEvents(NetworkTransaction transaction)
-        {
-            var currentStage = GetOrCreateCurrentStage();
 
-            var network = new Network
-            {
-                Stage = _currentStageIndex,
-                Url = transaction.Request.Url,
-                HttpMethod = transaction.Request.Method,
-                REQ_Payload = transaction.Request.Body,
-                RES_Payload = transaction.Response.Body
-            };
-
-            currentStage.Network = network;
-            // Notify UI
-        }
-        /// Flush tất cả pending transactions vào current stage
-        private void FlushPendingTransactions()
-        {
-            List<NetworkTransaction> transactionsToProcess;
-            lock (_lock)
-            {
-                int count = _pendingTransactions.Count;
-                if (count == 0)
-                {
-                    LogManager.Instance.LogDebug("No pending transactions to flush");
-                    return;
-                }
-
-                LogManager.Instance.LogInfomation($"Flushing {count} pending transaction(s) to Stage {_currentStageIndex}");
-
-                transactionsToProcess = new List<NetworkTransaction>(_pendingTransactions);
-                _pendingTransactions.Clear();
-
-                LogManager.Instance.LogInfomation($"Flushed {count} transaction(s) to Stage {_currentStageIndex}");
-            }
-            foreach (var transaction in transactionsToProcess)
-            {
-                try
-                {
-                    ProcessTransactionWithoutEvents(transaction);
-                }
-                catch (Exception ex)
-                {
-                    LogManager.Instance.LogError($"❌ Error processing buffered transaction: {ex.Message}");
-                }
-            }
-            OnStagesChanged?.Invoke(_testStages);
-        }
         #endregion
 
         public TestkitManagerService()
         {
-            SubscribeToMiddleware();
         }
 
-        private void SubscribeToMiddleware()
+        private void NotifyQueueCount()
         {
-            try
-            {
-                MiddlewareStart.Instance.OnTransactionCompleted += OnMiddlewareTransactionReceived;
-            }
-            catch (Exception ex)
-            {
-                throw;
-            }
+            int total = _pendingHttpNetwork.Count + _pendingTcpNetwork.Count;
+            LogManager.Instance.LogInfomation(total.ToString());
+            OnQueueCountChanged?.Invoke(total);
         }
 
-
-        private void UnsubscribeFromMiddleware()
+        public void FlushNetworkQueue()
         {
-
-            try
-            {
-                MiddlewareStart.Instance.OnTransactionCompleted -= OnMiddlewareTransactionReceived;
-
-            }
-            catch (Exception ex)
-            {
-                LogManager.Instance.LogError($"Failed to unsubscribe from Middleware: {ex.Message}");
-            }
-        }
-
-        private void OnMiddlewareTransactionReceived(NetworkTransaction transaction)
-        {
-            if (transaction == null)
-            {
-                LogManager.Instance.LogWarning("Received null transaction from Middleware");
-                return;
-            }
+            List<HttpNetworkFlow> httpToFlush;
+            List<TcpNetworkFlow> tcpToFlush;
 
             lock (_lock)
             {
-                _pendingTransactions.Enqueue(transaction);
-                LogManager.Instance.LogInfomation($"Transaction queued (Queue size: {_pendingTransactions.Count})");
+                if (_pendingHttpNetwork.Count == 0 && _pendingTcpNetwork.Count == 0) return;
+
+                var currentStage = GetOrCreateCurrentStage();
+
+                lock (_lock)
+                {
+                    if (_pendingHttpNetwork.Count == 0 && _pendingTcpNetwork.Count == 0) return;
+
+                    httpToFlush = _pendingHttpNetwork.ToList();
+                    tcpToFlush = _pendingTcpNetwork.ToList();
+
+                    _pendingHttpNetwork.Clear();
+                    _pendingTcpNetwork.Clear();
+                    NotifyQueueCount();
+                }
+
+                foreach (var flow in httpToFlush)
+                {
+                    if(currentStage.NetworkHttpFlows == null)
+                    {
+                        currentStage.NetworkHttpFlows = new ObservableCollection<HttpNetworkFlow>();
+                    }
+                    flow.Stage = _currentStageIndex;
+                    currentStage.NetworkHttpFlows.Add(flow); 
+                }
+
+                foreach (var flow in tcpToFlush)
+                {
+                    if (currentStage.NetworkTcpFlows == null)
+                    {
+                        currentStage.NetworkTcpFlows = new ObservableCollection<TcpNetworkFlow>();
+                    }
+                    flow.Stage = _currentStageIndex;
+                    currentStage.NetworkTcpFlows.Add(flow); 
+                }
+
+                OnStageUpdated?.Invoke(_currentStageIndex);
             }
 
-            OnTransactionReceived?.Invoke(transaction);
         }
 
-        public int GetPendingTransactionCount()
+        public void IngestHttpTransaction(HttpNetworkFlow httpFlow)
         {
+            if (httpFlow == null) return;
             lock (_lock)
             {
-                return _pendingTransactions.Count;
+                _pendingHttpNetwork.Enqueue(httpFlow);
             }
+            NotifyQueueCount();
         }
 
-        public void InitializeTestCase(string testCaseName)
+        public void IngestTcpTransaction(TcpNetworkFlow tcpFlow)
         {
-            _testCaseName = testCaseName;
-            _testStages.Clear();
-            _currentStageIndex = 0;
-
+            if (tcpFlow == null) return;
             lock (_lock)
             {
-                _pendingTransactions.Clear();
+                _pendingTcpNetwork.Enqueue(tcpFlow);
             }
-
-            LogManager.Instance.LogInfomation($"TestCase initialized: {testCaseName}");
+            NotifyQueueCount();
         }
 
         public Dictionary<int, TestStage> GetCurrentTestStages()
@@ -207,6 +171,8 @@ namespace TestKitManagement.Services
             intitalStage.User = initialInput;
             _testStages[_currentStageIndex] = intitalStage;
             // Notify UI
+
+            FlushNetworkQueue();
             OnStageCreated?.Invoke(_currentStageIndex);
             OnStagesChanged?.Invoke(_testStages);
         }
@@ -238,7 +204,7 @@ namespace TestKitManagement.Services
                 {
                     foreach (var testStage in _testStages.Values)
                     {
-                        if (testStage.User.Action == ActionKeywords.START_CLIENT)
+                        if (testStage.User.Action == ActionKeywords.START_CLIENT && testStage.User.Stage == _currentStageIndex)
                         {
                             testStage.Client = new Client
                             {
@@ -246,6 +212,10 @@ namespace TestKitManagement.Services
                                 Console = output,
                             };
                             isCaptureClient = true;
+                            OnClientOutputReceived?.Invoke(output);
+                            OnStageUpdated?.Invoke(_currentStageIndex);
+                            OnStagesChanged?.Invoke(_testStages);
+
                             return;
                         }
                     }
@@ -278,7 +248,7 @@ namespace TestKitManagement.Services
                 {
                     foreach (var testStage in _testStages.Values)
                     {
-                        if (testStage.User!.Action.Equals(ActionKeywords.START_SERVER))
+                        if (testStage.User!.Action.Equals(ActionKeywords.START_SERVER) && testStage.User.Stage == _currentStageIndex)
                         {
                             testStage.Server = new Server
                             {
@@ -286,18 +256,22 @@ namespace TestKitManagement.Services
                                 Console = output
                             };
                             isCaptureServer = true;
+
+                            OnClientOutputReceived?.Invoke(output);
+                            OnStageUpdated?.Invoke(_currentStageIndex);
+                            OnStagesChanged?.Invoke(_testStages);
+
+                            return;
                         }
 
                     }
                 }
-                else
-                {
+               
                     currentStage.Server = new Server
                     {
                         Stage = _currentStageIndex,
                         Console = output ?? string.Empty
                     };
-                }
 
             }
             // Notify UI
@@ -306,42 +280,46 @@ namespace TestKitManagement.Services
             OnStagesChanged?.Invoke(_testStages);
         }
 
-        public void ReceiveTransaction(NetworkTransaction transaction)
-        {
-            if (transaction == null)
-            {
-                return;
-            }
-            if (_currentStageIndex == 0)
-            {
-                lock (_lock)
-                {
-                    _pendingTransactions.Enqueue(transaction);
-                }
-                return;
-            }
-
-            ProcessTransactionWithoutEvents(transaction);
-        }
 
         public void ReceiveUserInput(string input, string dataType)
         {
             _currentStageIndex++;
             var newStage = CreateNewStage(_currentStageIndex, input);
 
-            FlushPendingTransactions();
-
             OnUserInputReceived?.Invoke(input, dataType);
             OnStageCreated?.Invoke(_currentStageIndex);
             OnStagesChanged?.Invoke(_testStages);
         }
 
-        public void Dispose()
+
+        public void DeleteStage(int stageKey)
         {
-            UnsubscribeFromMiddleware();
             lock (_lock)
             {
-                _pendingTransactions.Clear();
+                if (_testStages.ContainsKey(stageKey))
+                {
+                    _testStages.Remove(stageKey);
+
+                    if (_testStages.Count > 0)
+                    {
+                        _currentStageIndex = _testStages.Keys.Max();
+                    }
+                    else
+                    {
+                        _currentStageIndex = 0;
+                    }
+
+                    LogManager.Instance.LogInfomation($"Stage {stageKey} deleted. Current index updated to: {_currentStageIndex}");
+                }
+            }
+
+            OnStagesChanged?.Invoke(_testStages);
+        }
+
+        public void Dispose()
+        {
+            lock (_lock)
+            {
             }
             _testStages?.Clear();
         }

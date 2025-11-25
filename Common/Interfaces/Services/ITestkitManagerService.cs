@@ -1,4 +1,5 @@
 ﻿using Common.Models.Entities;
+using NetworkMonitor.Models;
 using static Common.Models.Entities.MiddlewareModel;
 
 namespace Common.Interfaces.Services
@@ -19,11 +20,10 @@ namespace Common.Interfaces.Services
         void CreateInitialStage(string action);
         void IncrementStage();
 
-        void InitializeTestCase(string testCaseName);
-
         Dictionary<int, TestStage> GetCurrentTestStages();
 
         int GetCurrentStageIndex();
+        void DeleteStage(int stageKey);
 
         #endregion
 
@@ -31,7 +31,7 @@ namespace Common.Interfaces.Services
         event Action<string, string> OnUserInputReceived;
         event Action<string> OnClientOutputReceived;
         event Action<string> OnServerOutputReceived;
-        event Action<NetworkTransaction> OnTransactionReceived;
+        //event Action<NetworkTransaction> OnTransactionReceived;
         /// <summary>
         /// Event khi stages thay đổi (để UI refresh toàn bộ)
         /// </summary>
@@ -47,9 +47,14 @@ namespace Common.Interfaces.Services
         event Action<int> OnStageUpdated;
         #endregion
 
-        #region Data from Middleware
-        void ReceiveTransaction(NetworkTransaction transaction);
-        int GetPendingTransactionCount();
+        #region Monitor Networking
+        event Action<int, HttpNetworkFlow> OnNewHttpFlow;
+        event Action<int> OnQueueCountChanged;
+        event Action<int, TcpNetworkFlow> OnNewTcpFlow;
+        void IngestHttpTransaction(HttpNetworkFlow httpFlow);
+        void IngestTcpTransaction(TcpNetworkFlow tcpFlow);
+        void FlushNetworkQueue();
         #endregion
+
     }
 }

@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 17
-VisualStudioVersion = 17.14.36429.23
+# Visual Studio Version 18
+VisualStudioVersion = 18.0.11217.181 d18.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Common", "Common\Common.csproj", "{81D128D7-4580-4976-AFA7-7457229818BB}"
 EndProject
@@ -16,6 +16,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WpfUI", "WpfUI\WpfUI.csproj", "{9BA9AA95-49B8-478A-BB3F-555A92A32630}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DatabaseServices", "DatabaseServices\DatabaseServices.csproj", "{BA80883B-19DE-4261-9D70-81F8B11221FB}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NetworkMonitor", "NetworkMonitor\NetworkMonitor.csproj", "{A362613C-D62F-451C-8098-D78C760BEDA6}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -111,6 +113,18 @@ Global
 		{BA80883B-19DE-4261-9D70-81F8B11221FB}.Release|x64.Build.0 = Release|Any CPU
 		{BA80883B-19DE-4261-9D70-81F8B11221FB}.Release|x86.ActiveCfg = Release|Any CPU
 		{BA80883B-19DE-4261-9D70-81F8B11221FB}.Release|x86.Build.0 = Release|Any CPU
+		{A362613C-D62F-451C-8098-D78C760BEDA6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A362613C-D62F-451C-8098-D78C760BEDA6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A362613C-D62F-451C-8098-D78C760BEDA6}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{A362613C-D62F-451C-8098-D78C760BEDA6}.Debug|x64.Build.0 = Debug|Any CPU
+		{A362613C-D62F-451C-8098-D78C760BEDA6}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{A362613C-D62F-451C-8098-D78C760BEDA6}.Debug|x86.Build.0 = Debug|Any CPU
+		{A362613C-D62F-451C-8098-D78C760BEDA6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A362613C-D62F-451C-8098-D78C760BEDA6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A362613C-D62F-451C-8098-D78C760BEDA6}.Release|x64.ActiveCfg = Release|Any CPU
+		{A362613C-D62F-451C-8098-D78C760BEDA6}.Release|x64.Build.0 = Release|Any CPU
+		{A362613C-D62F-451C-8098-D78C760BEDA6}.Release|x86.ActiveCfg = Release|Any CPU
+		{A362613C-D62F-451C-8098-D78C760BEDA6}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
