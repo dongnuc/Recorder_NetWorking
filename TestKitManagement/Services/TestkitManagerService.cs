@@ -17,7 +17,6 @@ namespace TestKitManagement.Services
         private readonly Queue<TcpNetworkFlow> _pendingTcpNetwork = new();
 
         private readonly object _lock = new object();
-        private string _testCaseName;
         #endregion
 
         public event Action<string, string> OnUserInputReceived;
@@ -60,10 +59,6 @@ namespace TestKitManagement.Services
 
 
         #endregion
-
-        public TestkitManagerService()
-        {
-        }
 
         private void NotifyQueueCount()
         {

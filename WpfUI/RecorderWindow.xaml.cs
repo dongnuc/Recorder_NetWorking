@@ -653,7 +653,6 @@ namespace WpfUI
 
             try
             {
-                LogManager.Instance.LogInfomation("Closing RecorderWindow - stopping all processes...");
                 this.IsEnabled = false;
                 _isClosing = true;
                 await CleanupAsync();
