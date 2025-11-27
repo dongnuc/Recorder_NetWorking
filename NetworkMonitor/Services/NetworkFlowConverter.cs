@@ -280,6 +280,8 @@ namespace NetworkMonitor.Services
             if (responseMatch.Success)
             {
                 httpData.HttpVersion = $"HTTP/{responseMatch.Groups[1].Value}";
+                //responseMatch.Groups[2].Value StatusCode
+                //responseMatch.Groups[3].Value STATUS_MESSAGE OK/NotFound
                 httpData.Status = $"{responseMatch.Groups[2].Value} {responseMatch.Groups[3].Value}".Trim();
             }
 

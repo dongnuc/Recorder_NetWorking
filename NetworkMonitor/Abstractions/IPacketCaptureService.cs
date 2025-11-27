@@ -9,16 +9,6 @@ namespace NetworkMonitor.Abstractions
     /// </summary>
     public interface IPacketCaptureService
     {
-        /// <summary>
-        /// Event raised when a packet is captured.
-        /// </summary>
-        event EventHandler<TcpNetworkFlow>? TcpFlowReceived;
-        event EventHandler<HttpNetworkFlow>? HttpFlowReceived;
-
-        /// <summary>
-        /// Event raised when a log message needs to be written.
-        /// </summary>
-        event EventHandler<LogMessageEventArgs>? LogMessage;
 
         /// <summary>
         /// Gets or sets whether to log captured packets via LogMessage event.

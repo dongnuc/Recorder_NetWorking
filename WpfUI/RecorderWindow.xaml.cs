@@ -703,8 +703,6 @@ namespace WpfUI
                     UpdateProcessButtonStates();
                 }
 
-                LogManager.Instance.LogInfomation("Server process stopped successfully");
-
             }
             catch (Exception ex)
             {

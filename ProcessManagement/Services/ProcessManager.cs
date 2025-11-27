@@ -321,7 +321,6 @@ namespace ProcessManagement.Services
                 {
                     cts?.Cancel();
                     cts?.Dispose();
-                    LogManager.Instance.LogDebug($" Input monitoring stopped for {processName}");
                 }
                 catch (Exception ex)
                 {
