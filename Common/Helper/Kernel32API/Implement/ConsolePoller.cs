@@ -42,8 +42,6 @@ namespace Common.Helper.Kernel32API
                 throw new ArgumentException("Invalid child process handle");
             }
 
-            LogManager.Instance.LogDebug($"📸 Capturing console snapshot for process PID: {child.processId}");
-
             // Wait for mutex
             WaitForSingleObject(mutex, Constants.INFINITE);
 
@@ -81,7 +79,6 @@ namespace Common.Helper.Kernel32API
                     return string.Empty;
                 }
 
-                // ✅ Expand buffer size if requested (first time only)
                 if (expandBuffer && !_firstPolls.ContainsKey(child.processId))
                 {
                     COORD newSize = info.dwSize;
@@ -92,7 +89,6 @@ namespace Common.Helper.Kernel32API
                     // Re-read buffer info after expansion
                     GetConsoleScreenBufferInfo(hOut, out info);
 
-                    LogManager.Instance.LogDebug($"✅ Buffer expanded for process {child.processId}");
                 }
 
                 // ✅ Read entire console buffer
@@ -130,8 +126,6 @@ namespace Common.Helper.Kernel32API
                 string result = string.Join(Environment.NewLine, lines);
 
                 FreeConsole();
-
-                LogManager.Instance.LogInfomation($"✅ Captured {lines.Count} lines, {result.Length} characters from process {child.processId}");
 
                 return result;
             }
@@ -171,7 +165,6 @@ namespace Common.Helper.Kernel32API
 
                     if (attempt < maxRetries)
                     {
-                        LogManager.Instance.LogDebug($"⏳ Retry {attempt}/{maxRetries} for process {child.processId}");
                         await Task.Delay(retryDelayMs);
                     }
                 }

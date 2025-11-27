@@ -302,15 +302,30 @@ namespace WpfUI
                         try
                         {
                             await tabData.RecorderWindow.CleanupAsync();
-                            LogManager.Instance?.LogDebug("RecorderWindow cleanup completed");
+                            if (tabData.TabItem.Content is FrameworkElement content)
+                            {
+                                content.DataContext = null;
+                            }
                         }
                         catch (Exception ex)
                         {
                             LogManager.Instance?.LogWarning($"Error cleaning up RecorderWindow: {ex.Message}");
                         }
                     }
+                    tabData.TabItem.Content = null;
 
-                    TestCaseTabControl.Items.Remove(tabData.TabItem);
+                    if (TestCaseTabControl.SelectedItem == tabData.TabItem)
+                    {
+                        TestCaseTabControl.SelectedItem = _activeTabs.Count > 1 ? null : WelcomeTab;
+
+                        TestCaseTabControl.UpdateLayout();
+                    }
+
+                    await Application.Current.Dispatcher.InvokeAsync(() =>
+                    {
+                        TestCaseTabControl.Items.Remove(tabData.TabItem);
+                    }, System.Windows.Threading.DispatcherPriority.DataBind);
+
                     _activeTabs.Remove(id);
 
                     if (_activeTabs.Count == 0)
@@ -318,8 +333,7 @@ namespace WpfUI
                         WelcomeTab.Visibility = Visibility.Visible;
                         TestCaseTabControl.SelectedItem = WelcomeTab;
                     }
-
-                    LogManager.Instance?.LogInfomation($" Tab closed successfully: {tabData.TestCaseName}");
+                   
                 }
                 else
                 {

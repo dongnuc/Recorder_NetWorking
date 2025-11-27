@@ -28,12 +28,12 @@ namespace WpfUI
         #region Fields Process
 
         private IProcessManager _processManager;
-        private ChildProcess _clientChild;
-        private IntPtr _clientMutex;
+        //private ChildProcess _clientChild;
+        //private IntPtr _clientMutex;
         private CancellationTokenSource _clientCts;
 
-        private ChildProcess _serverChild;
-        private IntPtr _serverMutex;
+        //private ChildProcess _serverChild;
+        //private IntPtr _serverMutex;
         private CancellationTokenSource _serverCts;
 
         private int _actualServerPort = 0;
@@ -92,7 +92,6 @@ namespace WpfUI
                     if (testStages != null && testStages.TryGetValue(value, out var stage))
                     {
                         SelectedStageData = stage;
-                        LogManager.Instance.LogDebug($"Stage {value} selected - Data loaded");
                     }
                     else
                     {
@@ -149,7 +148,6 @@ namespace WpfUI
 
             DataContext = this;
             SubscribeToDataSources();
-            LogManager.Instance.LogInfomation($"📝 Recorder window opened: {testCaseName}");
         }
 
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
@@ -181,10 +179,7 @@ namespace WpfUI
                 LogManager.Instance.LogWarning("⚠️ Không tìm thấy Loopback Adapter! Đang sử dụng card mạng vật lý: " + _device.Description);
                 LogManager.Instance.LogWarning("Lưu ý: Bạn sẽ KHÔNG bắt được traffic localhost (127.0.0.1).");
             }
-            else
-            {
-                LogManager.Instance.LogInfomation("✅ Đã chọn Loopback Adapter: " + _device.Description);
-            }
+            
             _ctsMonitor = new CancellationToken();
             await Task.Delay(500);
             return true;
@@ -202,7 +197,6 @@ namespace WpfUI
             _testkitManagerService.OnStagesChanged += OnStagesChanged;
 
             _testkitManagerService.OnQueueCountChanged += OnQueueCountChangedHandler;
-            LogManager.Instance.LogDebug(" Subscribed to data sources with sequential processing");
         }
 
         private void UnsubscribeFromDataSources()
@@ -215,7 +209,6 @@ namespace WpfUI
 
                 _testkitManagerService.OnQueueCountChanged -= OnQueueCountChangedHandler;
             }
-            LogManager.Instance.LogDebug(" Unsubscribed from data sources");
         }
 
         #endregion
@@ -229,8 +222,6 @@ namespace WpfUI
         {
             Dispatcher.Invoke(() =>
             {
-                LogManager.Instance.LogDebug($" Stage {stageIndex} created");
-
                 // Add to stage keys if not exists
                 if (!StageKeys.Contains(stageIndex))
                 {
@@ -252,7 +243,6 @@ namespace WpfUI
         {
             Dispatcher.Invoke(() =>
             {
-                LogManager.Instance.LogDebug($" Stage {stageIndex} updated");
 
                 // Refresh UI if currently viewing this stage
                 if (SelectedStageKey == stageIndex)
@@ -273,8 +263,6 @@ namespace WpfUI
         {
             Dispatcher.Invoke(() =>
             {
-                LogManager.Instance.LogDebug($" Test stages changed (total: {testStages.Count})");
-
                 // Refresh current stage data
                 int currentStageIndex = _testkitManagerService.GetCurrentStageIndex();
                 if (testStages.TryGetValue(currentStageIndex, out var currentStage))
@@ -294,8 +282,6 @@ namespace WpfUI
         private async Task<int> ReadServerActualPortAsync()
         {
             var appSettingsFile = Path.Combine(_serverExecutableDir, "appsettings.json");
-
-            LogManager.Instance?.LogInfomation($"📂 Looking for appsettings.json: {appSettingsFile}");
 
             int fileRetries = 0;
             while (!File.Exists(appSettingsFile) && fileRetries < 50)
@@ -516,7 +502,6 @@ namespace WpfUI
                 {
                     currentStage.Server = null;
                     OnPropertyChanged(nameof(SelectedStageData));
-                    LogManager.Instance.LogDebug($" Server output cleared for Stage {SelectedStageKey}");
                 }
             }
         }
@@ -536,7 +521,6 @@ namespace WpfUI
                 {
                     currentStage.Database = new Database();
                     OnPropertyChanged(nameof(SelectedStageData));
-                    LogManager.Instance.LogDebug($" Database data cleared for Stage {SelectedStageKey}");
                 }
             }
         }
@@ -553,24 +537,19 @@ namespace WpfUI
             {
                 var testStages = _testkitManagerService.GetCurrentTestStages();
 
-                // Kiểm tra xem Stage hiện tại có tồn tại không
                 if (testStages.TryGetValue(SelectedStageKey, out var currentStage))
                 {
-                    // --- XỬ LÝ XÓA DỮ LIỆU TẠI ĐÂY ---
 
-                    // 1. Xóa danh sách HTTP (nếu có)
                     if (currentStage.NetworkHttpFlows != null)
                     {
                         currentStage.NetworkHttpFlows.Clear();
                     }
 
-                    // 2. Xóa danh sách TCP (nếu có)
                     if (currentStage.NetworkTcpFlows != null)
                     {
                         currentStage.NetworkTcpFlows.Clear();
                     }
 
-                    // 3. Cập nhật lại UI (TextBox chi tiết sẽ tự rỗng do Binding)
                     OnPropertyChanged(nameof(SelectedStageData));
 
                     LogManager.Instance.LogDebug($"Network data cleared for Stage {SelectedStageKey}");
@@ -583,36 +562,32 @@ namespace WpfUI
 
         private void BtnDeleteTcpRow_Click(object sender, RoutedEventArgs e)
         {
-            if (dgTcp.SelectedItem is NetworkMonitor.Models.TcpNetworkFlow selectedItem)
-            {
-                var collection = SelectedStageData?.NetworkTcpFlows;
+            if (dgTcp.SelectedItems.Count == 0) return;
+            var collection = dgTcp.ItemsSource as System.Collections.IList;
 
-                if (collection != null)
+            if (collection != null)
+            {
+                var itemsToDelete = new System.Collections.ArrayList(dgTcp.SelectedItems);
+
+                foreach (var item in itemsToDelete)
                 {
-                    collection.Remove(selectedItem);
-
+                    collection.Remove(item);
                 }
-            }
-            else
-            {
-                MessageBox.Show("Please select a row to delete.", "Info", MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }
 
         private void BtnDeleteHttpRow_Click(object sender, RoutedEventArgs e)
         {
-            if (dgHttp.SelectedItem is NetworkMonitor.Models.HttpNetworkFlow selectedItem)
+            if (dgHttp.SelectedItems.Count == 0) return;
+            var collection = dgHttp.ItemsSource as System.Collections.IList;
+            if (collection != null)
             {
-                var collection = SelectedStageData?.NetworkHttpFlows;
+                var itemsToDelete = new System.Collections.ArrayList(dgHttp.SelectedItems);
 
-                if (collection != null)
+                foreach (var item in itemsToDelete)
                 {
-                    collection.Remove(selectedItem);
+                    collection.Remove(item);
                 }
-            }
-            else
-            {
-                MessageBox.Show("Please select a row to delete.", "Info", MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }
 
@@ -653,12 +628,10 @@ namespace WpfUI
 
             try
             {
-                LogManager.Instance.LogInfomation("Closing RecorderWindow - stopping all processes...");
                 this.IsEnabled = false;
                 _isClosing = true;
                 await CleanupAsync();
                 this.Close();
-                LogManager.Instance.LogInfomation("Recording stopped - all processes terminated");
             }
             catch (Exception ex)
             {
@@ -681,12 +654,6 @@ namespace WpfUI
 
             try
             {
-                if (_clientChild.hProcess == IntPtr.Zero)
-                {
-                    LogManager.Instance.LogWarning("Client process already closed");
-                    return;
-                }
-
                 LogManager.Instance.LogInfomation("Stopping Client process...");
 
                 if (_clientCts != null)
@@ -696,8 +663,6 @@ namespace WpfUI
 
                 await _processManager.CloseClientAsync();
 
-                _clientChild = default;
-                _clientMutex = IntPtr.Zero;
                 _clientCts?.Dispose();
                 _clientCts = null;
 
@@ -706,7 +671,6 @@ namespace WpfUI
                 {
                     UpdateProcessButtonStates();
                 }
-                LogManager.Instance.LogInfomation("Client process stopped successfully");
 
             }
             catch (Exception ex)
@@ -721,11 +685,6 @@ namespace WpfUI
         {
             try
             {
-                if (_serverChild.hProcess == IntPtr.Zero)
-                {
-                    LogManager.Instance.LogWarning("⚠️ Server process already closed");
-                    return;
-                }
                 LogManager.Instance.LogInfomation("Stopping Server process...");
 
                 if (_serverCts != null)
@@ -735,8 +694,6 @@ namespace WpfUI
 
                 await _processManager.CloseServerAsync();
 
-                _serverChild = default;
-                _serverMutex = IntPtr.Zero;
                 _serverCts?.Dispose();
                 _serverCts = null;
 
@@ -889,7 +846,6 @@ namespace WpfUI
                 BtnCloseServer.Visibility = _isServerRunning ? Visibility.Visible : Visibility.Collapsed;
                 BtnCloseServer.IsEnabled = true;
 
-                LogManager.Instance.LogDebug($" Buttons - Client running: {_isClientRunning}, Server running: {_isServerRunning}");
             });
 
         }
@@ -977,18 +933,6 @@ namespace WpfUI
                 throw new FileNotFoundException($"Client executable not found: {_clientPath}");
             }
 
-            if (_clientMutex != IntPtr.Zero && _clientCts != null)
-            {
-                try
-                {
-                    await CloseClientAsync();
-                }
-                catch (Exception ex)
-                {
-                    LogManager.Instance.LogError($"Error cleaning up old client: {ex.Message}");
-                }
-            }
-
             try
             {
                 if (_currentStageIndex >= 1)
@@ -1019,10 +963,7 @@ namespace WpfUI
                 );
 
                 //  ASSIGN to fields
-                _clientChild = clientResult.child;
-                _clientMutex = clientResult.mutex;
                 _clientCts = clientResult.cts;
-
                 _isClientRunning = true;
 
                 UpdateProcessButtonStates();
@@ -1049,19 +990,6 @@ namespace WpfUI
             {
                 throw new FileNotFoundException($"Server executable not found: {_serverPath}");
             }
-            if (_serverMutex != IntPtr.Zero || _serverCts != null)
-            {
-                LogManager.Instance.LogWarning("Server process handle still exists, cleaning up...");
-
-                try
-                {
-                    await CloseServerAsync();
-                }
-                catch (Exception ex)
-                {
-                    LogManager.Instance.LogError($"Error cleaning up old server: {ex.Message}");
-                }
-            }
 
             try
             {
@@ -1084,8 +1012,6 @@ namespace WpfUI
                     showConsoleMessages: false
                 );
 
-                _serverChild = serverResult.child;
-                _serverMutex = serverResult.mutex;
                 _serverCts = serverResult.cts;
 
                 _isServerRunning = true;
@@ -1115,10 +1041,6 @@ namespace WpfUI
         {
             try
             {
-                LogManager.Instance?.LogInfomation("🛑 Cleaning up RecorderWindow resources...");
-
-                // Un
-                //
                 // scribe from events FIRST
                 UnsubscribeFromDataSources();
 
@@ -1158,7 +1080,6 @@ namespace WpfUI
                 }
                 if (tasks.Any())
                 {
-                    LogManager.Instance?.LogInfomation($"Waiting for {tasks.Count} process(es) to close...");
                     await Task.WhenAll(tasks);
                 }
                 await Task.Delay(1000);
@@ -1173,8 +1094,6 @@ namespace WpfUI
                 {
                     LogManager.Instance?.LogWarning($"ProcessManager dispose failed: {ex.Message}");
                 }
-
-                LogManager.Instance?.LogInfomation(" RecorderWindow cleanup completed");
             }
             catch (Exception ex)
             {

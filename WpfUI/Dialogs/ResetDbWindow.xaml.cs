@@ -46,14 +46,22 @@ namespace WpfUI
             }
 
             var service = new ResetDatabaseService(connectionString);
-            await service.ResetDatabaseAsync(selectedFilePath);
+            var cts = new CancellationToken();
+            var isSuccess= await service.ExecuteSqlWithConnectionString(connectionString, selectedFilePath, cts);
 
-            LogManager.Instance.LogInfomation($"Executing SQL script: {selectedFilePath}");
+            if (isSuccess)
+            {
+                LogManager.Instance.LogInfomation($"Executing SQL script: {selectedFilePath}");
                 MessageBox.Show($"Đã reset thành công", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
-
+                
                 this.DialogResult = true;
                 this.Close();
-          
+            }
+            else
+            {
+                LogManager.Instance.LogError("Executing Sql fail");
+            }
+
         }
     }
 }
