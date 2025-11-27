@@ -39,7 +39,6 @@ namespace ProcessManagement.Services
             _mutexManager = new MutexManager();
             _consoleManager = new ConsoleManager();
             _processWaiter = new ProcessWaiter();
-            LogManager.Instance.LogDebug("ProcessManager initialized");
             _testkitManagerService = testkitManagerService;
         }
 
@@ -82,8 +81,6 @@ namespace ProcessManagement.Services
             {
                 StartInputMonitoring(child, mutex, name, cts.Token);
             }
-
-            LogManager.Instance.LogInfomation($"✅ {name} process started with PID: {child.processId}");
 
             return (child, mutex, cts);
         }
@@ -160,7 +157,6 @@ namespace ProcessManagement.Services
                     {
                         if (child.hProcess == IntPtr.Zero)
                         {
-                            LogManager.Instance.LogDebug($"Process {processName} handle is null, stopping monitor");
                             break;
                         }
                         //EnableProcessExitMonitoring(child, processName, mutex);
@@ -176,8 +172,6 @@ namespace ProcessManagement.Services
                             var timeSinceLastTrigger = DateTime.Now - lastTriggerTime;
                             if (timeSinceLastTrigger.TotalMilliseconds > DEBOUNCE_MS)
                             {
-                                LogManager.Instance.LogInfomation($" ===== ENTER KEY PRESSED in {processName} =====");
-
                                 // Execute capture sequence
                                 await ExecuteCaptureSequenceAsync(child, mutex, processName);
 
@@ -295,7 +289,6 @@ namespace ProcessManagement.Services
 
                 //  Update previous snapshot IMMEDIATELY after extracting input
                 _previousSnapshots[processName] = bufferAfterInput;
-                LogManager.Instance.LogDebug($" Updated previous snapshot for {processName} (length: {bufferAfterInput.Length})");
 
                 if (isClient)
                 {
@@ -491,7 +484,6 @@ namespace ProcessManagement.Services
         {
             try
             {
-                LogManager.Instance.LogDebug($"📸 Capturing snapshot for {processName}");
 
                 //  Capture console hiện tại
                 string currentSnapshot = await _consolePoller.CaptureCurrentConsoleAsync(
@@ -506,11 +498,9 @@ namespace ProcessManagement.Services
                     return;
                 }
 
-                LogManager.Instance.LogDebug($"Captured {currentSnapshot.Length} characters from {processName}");
 
                 //  Update previous snapshot 
                 _previousSnapshots[processName] = currentSnapshot;
-                LogManager.Instance.LogDebug($"Updated previous snapshot for {processName}");
             }
             catch (Exception ex)
             {

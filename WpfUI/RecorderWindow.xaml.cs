@@ -149,7 +149,6 @@ namespace WpfUI
 
             DataContext = this;
             SubscribeToDataSources();
-            LogManager.Instance.LogInfomation($"📝 Recorder window opened: {testCaseName}");
         }
 
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
@@ -202,7 +201,6 @@ namespace WpfUI
             _testkitManagerService.OnStagesChanged += OnStagesChanged;
 
             _testkitManagerService.OnQueueCountChanged += OnQueueCountChangedHandler;
-            LogManager.Instance.LogDebug(" Subscribed to data sources with sequential processing");
         }
 
         private void UnsubscribeFromDataSources()
@@ -215,7 +213,6 @@ namespace WpfUI
 
                 _testkitManagerService.OnQueueCountChanged -= OnQueueCountChangedHandler;
             }
-            LogManager.Instance.LogDebug(" Unsubscribed from data sources");
         }
 
         #endregion
@@ -252,7 +249,6 @@ namespace WpfUI
         {
             Dispatcher.Invoke(() =>
             {
-                LogManager.Instance.LogDebug($" Stage {stageIndex} updated");
 
                 // Refresh UI if currently viewing this stage
                 if (SelectedStageKey == stageIndex)
@@ -516,7 +512,6 @@ namespace WpfUI
                 {
                     currentStage.Server = null;
                     OnPropertyChanged(nameof(SelectedStageData));
-                    LogManager.Instance.LogDebug($" Server output cleared for Stage {SelectedStageKey}");
                 }
             }
         }
@@ -536,7 +531,6 @@ namespace WpfUI
                 {
                     currentStage.Database = new Database();
                     OnPropertyChanged(nameof(SelectedStageData));
-                    LogManager.Instance.LogDebug($" Database data cleared for Stage {SelectedStageKey}");
                 }
             }
         }
@@ -553,24 +547,19 @@ namespace WpfUI
             {
                 var testStages = _testkitManagerService.GetCurrentTestStages();
 
-                // Kiểm tra xem Stage hiện tại có tồn tại không
                 if (testStages.TryGetValue(SelectedStageKey, out var currentStage))
                 {
-                    // --- XỬ LÝ XÓA DỮ LIỆU TẠI ĐÂY ---
 
-                    // 1. Xóa danh sách HTTP (nếu có)
                     if (currentStage.NetworkHttpFlows != null)
                     {
                         currentStage.NetworkHttpFlows.Clear();
                     }
 
-                    // 2. Xóa danh sách TCP (nếu có)
                     if (currentStage.NetworkTcpFlows != null)
                     {
                         currentStage.NetworkTcpFlows.Clear();
                     }
 
-                    // 3. Cập nhật lại UI (TextBox chi tiết sẽ tự rỗng do Binding)
                     OnPropertyChanged(nameof(SelectedStageData));
 
                     LogManager.Instance.LogDebug($"Network data cleared for Stage {SelectedStageKey}");

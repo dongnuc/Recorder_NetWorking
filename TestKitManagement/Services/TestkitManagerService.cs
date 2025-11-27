@@ -63,7 +63,6 @@ namespace TestKitManagement.Services
         private void NotifyQueueCount()
         {
             int total = _pendingHttpNetwork.Count + _pendingTcpNetwork.Count;
-            LogManager.Instance.LogInfomation(total.ToString());
             OnQueueCountChanged?.Invoke(total);
         }
 

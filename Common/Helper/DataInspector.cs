@@ -101,12 +101,8 @@ namespace Common.Helper
             return true;
         }
 
-        public static string ExtractDifference(string before, string after, string stageName = null)
+        public static string ExtractDifference(string before, string after)
         {
-            if (!string.IsNullOrEmpty(stageName))
-            {
-                LogManager.Instance.LogDebug($"🔍 Extracting difference for: {stageName}");
-            }
 
             // Handle empty cases
             if (string.IsNullOrEmpty(after))
@@ -117,7 +113,6 @@ namespace Common.Helper
 
             if (string.IsNullOrEmpty(before))
             {
-                LogManager.Instance.LogDebug($"   ✅ BEFORE is empty - Return full AFTER ({after.Length} chars)");
                 LogManager.Instance.LogInfomation(after);
                 return after;
             }
@@ -132,7 +127,6 @@ namespace Common.Helper
                 // Extract new content
                 string newContent = afterTrimmed.Substring(beforeTrimmed.Length);
 
-                LogManager.Instance.LogDebug($"   ✅ Extracted {newContent.Length} new characters");
                 LogManager.Instance.LogInfomation(newContent);
 
                 return newContent;
@@ -158,9 +152,6 @@ namespace Common.Helper
         /// </summary>
         public static string ExtractInputFromLastLine(string before, string after)
         {
-            LogManager.Instance.LogDebug("🔍 ===== ExtractInputFromLastLine START =====");
-            LogManager.Instance.LogDebug($"BEFORE length: {before?.Length ?? 0}");
-            LogManager.Instance.LogDebug($"AFTER length: {after?.Length ?? 0}");
 
             string afterTrimmed = (after ?? string.Empty).TrimEnd();
             if (afterTrimmed.Length == 0)
@@ -170,10 +161,6 @@ namespace Common.Helper
             }
 
             string beforeTrimmed = (before ?? string.Empty).TrimEnd();
-
-            // ✅ Log raw content
-            LogManager.Instance.LogDebug($"BEFORE (last 100 chars): {(beforeTrimmed.Length > 100 ? beforeTrimmed.Substring(beforeTrimmed.Length - 100) : beforeTrimmed)}");
-            LogManager.Instance.LogDebug($"AFTER (last 100 chars): {(afterTrimmed.Length > 100 ? afterTrimmed.Substring(afterTrimmed.Length - 100) : afterTrimmed)}");
 
             // Case 1: BEFORE is empty
             if (beforeTrimmed.Length == 0)
