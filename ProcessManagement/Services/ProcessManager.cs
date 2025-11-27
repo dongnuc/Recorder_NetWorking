@@ -144,8 +144,6 @@ namespace ProcessManagement.Services
 
             Task.Run(async () =>
             {
-                LogManager.Instance.LogDebug($"🔍 Started Enter key monitoring for {processName}");
-
                 bool lastEnterState = false;
                 bool lastF10State = false;
                 DateTime lastTriggerTime = DateTime.MinValue;
@@ -206,7 +204,6 @@ namespace ProcessManagement.Services
                     }
                 }
 
-                LogManager.Instance.LogDebug($" Stopped Enter key monitoring for {processName}");
             }, cts.Token);
         }
 
@@ -409,7 +406,6 @@ namespace ProcessManagement.Services
             _processHandles.Clear();
             _previousSnapshots.Clear();
 
-            LogManager.Instance.LogDebug("ProcessManager disposed");
         }
 
         public async Task CloseClientAsync()
