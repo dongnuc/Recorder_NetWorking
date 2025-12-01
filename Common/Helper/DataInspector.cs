@@ -148,7 +148,7 @@ namespace Common.Helper
         }
 
         /// <summary>
-        /// ✅ IMPROVED: Extract input với better logging
+        ///  Extract input với better logging
         /// </summary>
         public static string ExtractInputFromLastLine(string before, string after)
         {

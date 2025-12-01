@@ -1,4 +1,5 @@
 ﻿﻿using Common.Interfaces.Services;
+using Common.Logging;
 using NetworkMonitor.Abstractions;
 using NetworkMonitor.Keywords;
 using NetworkMonitor.Models;
@@ -14,22 +15,11 @@ namespace NetworkMonitor.Services
     public class PacketCaptureService : IPacketCaptureService
     {
         private ICaptureDevice? _device;
-        private List<int>? _monitoredPorts;
-        private bool _monitorAllPorts;
+        private int _targetPort;
         private bool _isCapturing;
         private bool _logCapturedPackets = false; // Enable/disable packet logging
         private readonly ITestkitManagerService _testkitManager;
         private readonly string _protocol;
-        /// <summary>
-        /// Event raised when a packet is captured.
-        /// </summary>
-        public event EventHandler<TcpNetworkFlow>? TcpFlowReceived;
-        public event EventHandler<HttpNetworkFlow>? HttpFlowReceived;
-
-        /// <summary>
-        /// Event raised when a log message needs to be written.
-        /// </summary>
-        public event EventHandler<LogMessageEventArgs>? LogMessage;
 
         /// <summary>
         /// Gets or sets whether to log captured packets via LogMessage event.
@@ -72,11 +62,10 @@ namespace NetworkMonitor.Services
                     _device.StopCapture();
                     _device.Close();
                     _isCapturing = false;
-                    RaiseLogMessage(Service_Keywords.SnifferStoppedCapture, false);
                 }
                 catch (Exception ex)
                 {
-                    RaiseLogMessage(string.Format(Service_Keywords.StopCloseError, ex.GetType().Name, ex.Message), true);
+                    LogManager.Instance.LogError(string.Format(Service_Keywords.StopCloseError, ex.GetType().Name, ex.Message));
                 }
             }
         }
@@ -87,24 +76,17 @@ namespace NetworkMonitor.Services
         private void StartCapture(ICaptureDevice device, string portsMode, string? customPorts,
             CancellationToken cancellationToken, TaskCompletionSource<bool> startupSignal)
         {
-            RaiseLogMessage("--- Start Monitor  ---", isError: false);
             _device = device;
-
+            var isPort= int.TryParse(portsMode, out _targetPort);
+            if (!isPort)
+            {
+                return;
+            }
             // Parse ports configuration
             string portsArg = portsMode;
             if (portsMode == Service_Keywords.PortsModeCustom && !string.IsNullOrEmpty(customPorts))
             {
                 portsArg = customPorts;
-            }
-
-            try
-            {
-                (_monitoredPorts, _monitorAllPorts) = ParsePorts(portsArg);
-            }
-            catch (Exception ex)
-            {
-                RaiseLogMessage($"Invalid ports: {ex.Message}", true);
-                return;
             }
 
             // Ensure we only attach the handler once
@@ -117,7 +99,7 @@ namespace NetworkMonitor.Services
             }
             catch (Exception ex)
             {
-                RaiseLogMessage(string.Format(Service_Keywords.OpenDeviceError, ex.GetType().Name, ex.Message), true);
+                LogManager.Instance.LogError(string.Format(Service_Keywords.OpenDeviceError, ex.GetType().Name, ex.Message));
                 return;
             }
 
@@ -127,11 +109,10 @@ namespace NetworkMonitor.Services
             try
             {
                 device.Filter = filter;
-                RaiseLogMessage(string.Format(Service_Keywords.SnifferAppliedFilter, filter), false);
             }
             catch (Exception ex)
             {
-                RaiseLogMessage(string.Format(Service_Keywords.FilterError, ex.GetType().Name, ex.Message), true);
+                LogManager.Instance.LogError(string.Format(Service_Keywords.FilterError, ex.GetType().Name, ex.Message));
                 try { device.Filter = ""; } catch { }
             }
 
@@ -139,12 +120,12 @@ namespace NetworkMonitor.Services
             {
                 device.StartCapture();
                 _isCapturing = true;
-                RaiseLogMessage(string.Format(Service_Keywords.SnifferStartedCapture, device.Description), false);
+                LogManager.Instance.LogDebug(string.Format(Service_Keywords.SnifferStartedCapture, device.Description));
                 startupSignal.TrySetResult(true);
             }
             catch (Exception ex)
             {
-                RaiseLogMessage(string.Format(Service_Keywords.StartCaptureError, ex.GetType().Name, ex.Message), true);
+                LogManager.Instance.LogError(string.Format(Service_Keywords.StartCaptureError, ex.GetType().Name, ex.Message));
                 startupSignal.TrySetException(ex);
                 return;
             }
@@ -168,65 +149,8 @@ namespace NetworkMonitor.Services
         /// </summary>
         private string BuildPacketFilter()
         {
-            string filter = Network_Keywords.FilterTcpOrUdp;
-
-            if (!_monitorAllPorts && _monitoredPorts != null && _monitoredPorts.Count > 0)
-            {
-                var tokens = new List<string>();
-                foreach (var p in _monitoredPorts)
-                {
-                    // Only add valid port numbers
-                    if (p > Network_Keywords.MinPort - 1 && p <= Network_Keywords.MaxPort)
-                    {
-                        tokens.Add($"{Network_Keywords.FilterTCP} port {p}");
-                        tokens.Add($"{Network_Keywords.FilterUDP} port {p}");
-                    }
-                }
-                if (tokens.Count > 0)
-                    filter = string.Join(Network_Keywords.FilterOrSeparator, tokens);
-            }
-
-            return filter;
-        }
-
-        /// <summary>
-        /// Parses the ports argument to determine which ports to monitor.
-        /// </summary>
-        private (List<int>?, bool) ParsePorts(string portsArg)
-        {
-            if (portsArg.Equals(Service_Keywords.PortsModeAll, StringComparison.OrdinalIgnoreCase))
-                return (null, true);
-
-            if (portsArg.Equals(Service_Keywords.PortsModeCommon, StringComparison.OrdinalIgnoreCase))
-                return (Network_Keywords.CommonPorts.ToList(), false);
-
-            if (portsArg.Equals(Service_Keywords.PortsModeTargeted, StringComparison.OrdinalIgnoreCase))
-                return (Network_Keywords.TargetedPorts.ToList(), false);
-
-            try
-            {
-                var ports = new List<int>();
-                foreach (var portStr in portsArg.Split(','))
-                {
-                    if (int.TryParse(portStr.Trim(), out int port))
-                    {
-                        ports.Add(port);
-                    }
-                    else
-                    {
-                        throw new ArgumentException($"'{portStr.Trim()}' is not a valid port number.");
-                    }
-                }
-                return (ports, false);
-            }
-            catch (ArgumentException)
-            {
-                throw;
-            }
-            catch (Exception)
-            {
-                throw new ArgumentException(Validation_Keywords.InvalidPortsFormat);
-            }
+            // Filter đơn giản: tcp port X or udp port X
+            return $"{Network_Keywords.FilterTCP} port {_targetPort} or {Network_Keywords.FilterUDP} port {_targetPort}";
         }
 
         /// <summary>
@@ -234,7 +158,6 @@ namespace NetworkMonitor.Services
         /// </summary>
         private void Device_OnPacketArrival(object sender, PacketCapture e)
         {
-            RaiseLogMessage("--- Packet Arrived ---", isError: false);
             try
             {
                 var raw = e.GetPacket();
@@ -282,10 +205,9 @@ namespace NetworkMonitor.Services
                 }
 
                 // Respect monitored ports if configured
-                if (!_monitorAllPorts && _monitoredPorts != null && _monitoredPorts.Count > 0)
+                if (srcPort != _targetPort && dstPort != _targetPort)
                 {
-                    bool match = (_monitoredPorts.Contains(srcPort) || _monitoredPorts.Contains(dstPort));
-                    if (!match) return;
+                    return;
                 }
 
                 // Detect HTTP protocol
@@ -309,25 +231,24 @@ namespace NetworkMonitor.Services
                     Timestamp = raw.Timeval.Date
                 };
 
+                int monitoredPort = _targetPort;
+
                 if (_protocol.Equals(Network_Keywords.ProtocolHTTP,StringComparison.OrdinalIgnoreCase))
                 {
-                    var monitoredPort = GetMatchingMonitoredPort(eventArgs.SourcePort, eventArgs.DestinationPort);
                     var flow = NetworkFlowConverter.ToHttpNetworkFlow(eventArgs, monitoredPort);
                     _testkitManager.IngestHttpTransaction(flow);
                 }
                 else
                 {
-                    var monitoredPort = GetMatchingMonitoredPort(eventArgs.SourcePort, eventArgs.DestinationPort);
                     var flow = NetworkFlowConverter.ToTcpNetworkFlow(eventArgs, monitoredPort);
                     _testkitManager.IngestTcpTransaction(flow);
-
                 }
 
 
             }
             catch (Exception ex)
             {
-                RaiseLogMessage(string.Format(Service_Keywords.HandlerError, DateTime.Now.ToString(Logging_Keywords.TimestampFormat), ex.GetType().Name, ex.Message), true);
+                LogManager.Instance.LogError(string.Format(Service_Keywords.HandlerError, DateTime.Now.ToString(Logging_Keywords.TimestampFormat), ex.GetType().Name, ex.Message));
             }
         }
 
@@ -383,39 +304,6 @@ namespace NetworkMonitor.Services
                    method.Equals(Network_Keywords.HttpMethodCONNECT, StringComparison.OrdinalIgnoreCase);
         }
 
-        /// <summary>
-        /// Raises a log message event.
-        /// </summary>
-        private void RaiseLogMessage(string message, bool isError)
-        {
-            LogMessage?.Invoke(this, new LogMessageEventArgs
-            {
-                Message = message,
-                IsError = isError
-            });
-        }
-
-
-        /// <summary>
-        /// Gets the monitored port that matches either the source or destination port.
-        /// Returns null if no monitored port matches.
-        /// </summary>
-        private int? GetMatchingMonitoredPort(int sourcePort, int destinationPort)
-        {
-            if (_monitorAllPorts || _monitoredPorts == null || _monitoredPorts.Count == 0)
-                return null;
-
-            // Check if source port is a monitored port
-            if (_monitoredPorts.Contains(sourcePort))
-                return sourcePort;
-
-            // Check if destination port is a monitored port
-            if (_monitoredPorts.Contains(destinationPort))
-                return destinationPort;
-
-            // No match found, but we have monitored ports - return first as fallback
-            return _monitoredPorts.Count > 0 ? _monitoredPorts[0] : null;
-        }
 
     }
 
