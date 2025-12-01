@@ -67,7 +67,6 @@ namespace WpfUI
                 return;
             }
 
-            TxtStatus.Text = "Checking project...";
             BtnCreateProject.IsEnabled = false;
 
             try
@@ -86,7 +85,6 @@ namespace WpfUI
 
                     if (result == MessageBoxResult.No)
                     {
-                        TxtStatus.Text = "Đã hủy. Vui lòng chọn tên hoặc vị trí khác.";
                         BtnCreateProject.IsEnabled = true;
                         return;
                     }
@@ -114,7 +112,6 @@ namespace WpfUI
             }
             catch (Exception ex)
             {
-                TxtStatus.Text = "Failed to create/open project.";
                 LogManager.Instance.LogError($"Failed to create/open project: {ex.Message}");
                 MessageBox.Show($"Failed to create/open project: {ex.Message}", "Error");
                 BtnCreateProject.IsEnabled = true;
