@@ -31,15 +31,21 @@
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
 
-                <TextBlock Grid.Row="0" Text="Open Recent TestKit" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,10"/>
+                <TextBlock Grid.Row="0" Text="Open Recent" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,10"/>
 
                 <Grid Grid.Row="1" Margin="0,0,0,10">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <TextBox Grid.Column="0" Height="30" VerticalContentAlignment="Center" Margin="0,0,5,0"/>
-                    <Button Grid.Column="1" Content="Search" Width="80" Height="30"/>
+
+                    <TextBox x:Name="TxtSearch" 
+                             Grid.Column="0" Height="30" 
+                             VerticalContentAlignment="Center" Margin="0,0,5,0"
+                             TextChanged="TxtSearch_TextChanged"/>
+
+                    <Button Grid.Column="1" Content="Search" Width="80" Height="30"
+                            Click="BtnSearch_Click"/>
                 </Grid>
 
                 <Border Grid.Row="2" BorderBrush="#CCC" BorderThickness="1" CornerRadius="3" Background="White">
@@ -47,21 +53,61 @@
                              BorderThickness="0"
                              ScrollViewer.VerticalScrollBarVisibility="Auto"
                              SelectionChanged="LstRecentProjectsOpen"
-                             Cursor="Hand">
-
+                             Cursor="Hand"
+                             HorizontalContentAlignment="Stretch">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <StackPanel Margin="5">
-                                    <TextBlock Text="{Binding Name}" 
-                                               FontWeight="SemiBold" 
-                                               FontSize="14" 
-                                               Foreground="#2C3E50"/>
+                                <Grid Margin="5">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
 
-                                    <TextBlock Text="{Binding Date}" 
-                                               FontSize="11" 
-                                               Foreground="Gray" 
-                                               Margin="0,2,0,0"/>
-                                </StackPanel>
+                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Name}" 
+                                                   FontWeight="SemiBold" 
+                                                   FontSize="14" 
+                                                   Foreground="#2C3E50"/>
+                                        <TextBlock Text="{Binding Date}" 
+                                                   FontSize="11" 
+                                                   Foreground="Gray" 
+                                                   Margin="0,2,0,0"/>
+                                    </StackPanel>
+
+                                    <Button Grid.Column="1" 
+                                            Content="✕" 
+                                            Width="25" Height="25"
+                                            Background="Transparent" 
+                                            BorderThickness="0"
+                                            Foreground="#999"
+                                            FontWeight="Bold"
+                                            Cursor="Hand"
+                                            ToolTip="Remove from list"
+                                            Click="BtnRemoveRecent_Click"
+                                            Tag="{Binding Path}"
+                                            VerticalAlignment="Center"
+                                            Margin="10,0,0,0">
+                                        <Button.Style>
+                                            <Style TargetType="Button">
+                                                <Setter Property="Template">
+                                                    <Setter.Value>
+                                                        <ControlTemplate TargetType="Button">
+                                                            <Border Background="{TemplateBinding Background}" CornerRadius="12">
+                                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                            </Border>
+                                                        </ControlTemplate>
+                                                    </Setter.Value>
+                                                </Setter>
+                                                <Style.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter Property="Background" Value="#EEE"/>
+                                                        <Setter Property="Foreground" Value="Red"/>
+                                                    </Trigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Button.Style>
+                                    </Button>
+                                </Grid>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
 
@@ -80,8 +126,10 @@
                                 <TextBlock Text="&#xE8B7;" FontFamily="Segoe MDL2 Assets" 
                                            FontSize="32" VerticalAlignment="Center"
                                            Foreground="#D4840E"/>
-                                
-                                <TextBlock Text="Create New TestKit" 
+                                <TextBlock Text="&#xE710;" FontFamily="Segoe MDL2 Assets" 
+                                           FontSize="16" VerticalAlignment="Bottom"
+                                           Foreground="Green" FontWeight="Bold" Margin="-12,0,10,5"/>
+                                <TextBlock Text="Create New Project" 
                                            FontSize="16" VerticalAlignment="Center"
                                            FontWeight="SemiBold"/>
                             </StackPanel>
@@ -95,7 +143,7 @@
                                 <TextBlock Text="&#xE8B7;" FontFamily="Segoe MDL2 Assets" 
                                            FontSize="32" VerticalAlignment="Center"
                                            Foreground="#D4840E" Margin="0,0,10,0"/>
-                                <TextBlock Text="Open TestKit folder" 
+                                <TextBlock Text="Open Project folder" 
                                            FontSize="16" VerticalAlignment="Center"
                                            FontWeight="SemiBold"/>
                             </StackPanel>
