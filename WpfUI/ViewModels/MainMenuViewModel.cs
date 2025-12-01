@@ -116,7 +116,7 @@ namespace WpfUI.ViewModels
                 _folderHandler.CopyTemplateFromResource(questionPath, _questionTemplateDir, false,
                     "Header.xlsx", "Environment.xlsx");
 
-                string chosenEnvRunFile = useDatabase ? "EnvRunDB.xlsx" : "EnvRunNoDB.xlsx";
+                string chosenEnvRunFile = "EnvRunDB.xlsx";
                 string srcSheetPath = Path.Combine(_questionTemplateDir, chosenEnvRunFile);
                 string destEnvPath = Path.Combine(questionPath, "Environment.xlsx");
 
