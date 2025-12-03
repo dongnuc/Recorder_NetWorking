@@ -21,16 +21,6 @@ namespace NetworkMonitor.Services
         private readonly ITestkitManagerService _testkitManager;
         private readonly string _protocol;
 
-        /// <summary>
-        /// Gets or sets whether to log captured packets via LogMessage event.
-        /// When enabled, each captured packet will be logged with its details including TCP flags.
-        /// </summary>
-        public bool LogCapturedPackets
-        {
-            get => _logCapturedPackets;
-            set => _logCapturedPackets = value;
-        }
-
         public PacketCaptureService(ITestkitManagerService testkitManagerService,string protocol)
         {
             _testkitManager = testkitManagerService;

@@ -9,13 +9,6 @@ namespace NetworkMonitor.Abstractions
     /// </summary>
     public interface IPacketCaptureService
     {
-
-        /// <summary>
-        /// Gets or sets whether to log captured packets via LogMessage event.
-        /// When enabled, each captured packet will be logged with its details including TCP flags.
-        /// </summary>
-        bool LogCapturedPackets { get; set; }
-
         /// <summary>
         /// Starts capturing packets on the specified device.
         /// </summary>
@@ -50,12 +43,4 @@ namespace NetworkMonitor.Abstractions
         public DateTime Timestamp { get; set; }
     }
 
-    /// <summary>
-    /// Event arguments for log message event.
-    /// </summary>
-    public class LogMessageEventArgs : EventArgs
-    {
-        public string Message { get; set; } = string.Empty;
-        public bool IsError { get; set; }
-    }
 }

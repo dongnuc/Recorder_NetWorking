@@ -24,7 +24,9 @@ namespace Common.Interfaces.Services
 
         int GetCurrentStageIndex();
         void DeleteStage(int stageKey);
+        void CreateCloseServerStage();
 
+        void CreateCloseClientStage();
         #endregion
 
         #region Events for UI Binding
