@@ -183,6 +183,43 @@ namespace TestKitManagement.Services
             }
         }
 
+        public void CreateCloseClientStage()
+        {
+            IncrementStage();
+            var closeClient = new TestStage();
+            var userAction = new User
+            {
+                Stage = _currentStageIndex,
+                Action = ActionKeywords.CLOSE_CLIENT,
+                Input = string.Empty
+            };
+
+            closeClient.User = userAction;
+            _testStages[_currentStageIndex] = closeClient;
+
+            FlushNetworkQueue();
+            OnStageCreated?.Invoke(_currentStageIndex);
+            OnStagesChanged?.Invoke(_testStages);
+        }
+
+        public void CreateCloseServerStage()
+        {
+            IncrementStage();
+            var closeServer = new TestStage();
+            var userAction = new User
+            {
+                Stage = _currentStageIndex,
+                Action = ActionKeywords.CLOSE_SERVER,
+                Input = string.Empty
+            };
+            closeServer.User = userAction;
+            _testStages[_currentStageIndex] = closeServer;
+
+            FlushNetworkQueue();
+            OnStageCreated?.Invoke(_currentStageIndex);
+            OnStagesChanged?.Invoke(_testStages);
+        }
+
         public void ReceiveClientOutput(string output)
         {
             var currentStage = GetOrCreateCurrentStage();

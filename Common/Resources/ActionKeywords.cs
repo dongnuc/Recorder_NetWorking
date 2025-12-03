@@ -7,6 +7,8 @@
         public const string START_CLIENT= "StartClient";
         public const string END_CLIENT = "EndClient";
         public const string END_SERVER = "EndServer";
+        public const string CLOSE_CLIENT = "CloseClient";
+        public const string CLOSE_SERVER = "CloseServer";
 
     }
 }

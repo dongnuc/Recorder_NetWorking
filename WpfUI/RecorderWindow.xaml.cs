@@ -1,6 +1,4 @@
-﻿using Common.Helper;
-using Common.Helper.Kernel32API;
-using Common.Interfaces.IOFile;
+﻿using Common.Interfaces.IOFile;
 using Common.Interfaces.Services;
 using Common.Logging;
 using Common.Models.Entities;
@@ -12,7 +10,6 @@ using SharpPcap;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
-using System.Net.WebSockets;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Windows;
@@ -864,6 +861,7 @@ namespace WpfUI
                 BtnCloseClient.IsEnabled = false;
 
                 await CloseClientAsync();
+                _testkitManagerService.CreateCloseClientStage();
                 LogManager.Instance.LogInfomation(" Client process stopped successfully");
 
             }
@@ -897,6 +895,7 @@ namespace WpfUI
             {
                 BtnCloseServer.IsEnabled = false;
                 await CloseServerAsync();
+                _testkitManagerService.CreateCloseServerStage();
                 MessageBox.Show(
                     "Server process stopped successfully.",
                     "Success",
