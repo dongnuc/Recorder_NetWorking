@@ -33,7 +33,7 @@ namespace WpfUI
         //private IntPtr _serverMutex;
         private CancellationTokenSource _serverCts;
 
-        private int _actualServerPort = 0;
+        private int _actualServerPort = 4000;
         private string _serverExecutableDir = "";
 
         private int _currentStageIndex = 0;
@@ -160,6 +160,12 @@ namespace WpfUI
             var devices = SharpPcap.CaptureDeviceList.Instance;
 
             _actualServerPort = await ReadServerActualPortAsync();
+            // fix port 3000
+            if(_actualServerPort == -1)
+            {
+                _actualServerPort = 4000;
+            }
+
             if (devices.Count == 0)
             {
                 return false;

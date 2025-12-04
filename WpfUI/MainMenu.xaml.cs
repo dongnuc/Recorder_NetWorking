@@ -227,6 +227,11 @@ namespace WpfUI
                 var recorderWindow = new RecorderWindow(testcasePath, testcaseName, clientPath,
                     serverPath, isHttp,
                     processManager, _fileHandler, testkitManagerSerive);
+                bool initSuccess = await recorderWindow.InitializeAsync();
+                if (!initSuccess)
+                {
+                    LogManager.Instance.LogWarning("Device is null");
+                }
 
                 var windowContent = recorderWindow.Content as FrameworkElement;
                 recorderWindow.Content = null;
@@ -260,7 +265,6 @@ namespace WpfUI
 
                 TestCaseTabControl.Items.Add(tabItem);
                 TestCaseTabControl.SelectedItem = tabItem;
-                await recorderWindow.InitializeAsync();
             }
             catch (Exception ex)
             {
