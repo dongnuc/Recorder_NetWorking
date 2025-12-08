@@ -316,15 +316,14 @@ namespace ProcessManagement.Services
                         var outputSplit = extractedCapture.Split(new[] { "\r\n", "\n", "\r" }, StringSplitOptions.None);
 
                         var outputLines = (outputSplit.Length > 0 && outputSplit[0] == "")
-                            ? outputSplit.Skip(1).Where(l => !string.IsNullOrWhiteSpace(l))
-                            : outputSplit.Where(l => !string.IsNullOrWhiteSpace(l));
+                           ? outputSplit.Skip(1).Where(l => l != null)  
+                           : outputSplit.Where(l => l != null);
 
                         string outputResult = string.Join(Environment.NewLine, outputLines);
                         _testkitManagerService.ReceiveServerOutput(outputResult);
                     }
                 }
 
-                //  Update previous snapshot IMMEDIATELY after extracting input
                 _previousSnapshots[processName] = bufferAfterInput;
             }
             catch (Exception ex)
@@ -452,7 +451,6 @@ namespace ProcessManagement.Services
                     // Close process
                     CloseSingle(child, mutex, false);
 
-                    LogManager.Instance.LogInfomation("✅ Client process closed and snapshot reset");
                 }
                 else
                 {

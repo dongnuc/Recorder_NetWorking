@@ -114,7 +114,6 @@ namespace NetworkMonitor.Services
             {
                 device.StartCapture();
                 _isCapturing = true;
-                LogManager.Instance.LogDebug(string.Format(Service_Keywords.SnifferStartedCapture, device.Description));
                 startupSignal.TrySetResult(true);
             }
             catch (Exception ex)

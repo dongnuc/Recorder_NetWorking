@@ -1,4 +1,5 @@
-﻿using Common.Interfaces.IOFile;
+﻿using Common.Helper;
+using Common.Interfaces.IOFile;
 using Common.Interfaces.Services;
 using Common.Logging;
 using Common.Models.Entities;
@@ -158,7 +159,7 @@ namespace WpfUI
             _serviceMonitor = new PacketCaptureService(_testkitManagerService,protocol);
             var devices = SharpPcap.CaptureDeviceList.Instance;
 
-            _actualServerPort = await ReadServerActualPortAsync();
+            _actualServerPort = AppSettingsManager.ReadPortFromExePath(_serverPath) ?? -1;
             // fix port 3000
             if(_actualServerPort == -1)
             {
