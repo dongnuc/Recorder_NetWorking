@@ -123,7 +123,6 @@ namespace WpfUI
         private PacketCaptureService _serviceMonitor;
         private ILiveDevice _device;
         private CancellationToken _ctsMonitor;
-        private bool _isInputFirst = false;
 
         #region Constructor
 
@@ -287,10 +286,9 @@ namespace WpfUI
             var appSettingsFile = Path.Combine(_serverExecutableDir, "appsettings.json");
 
             int fileRetries = 0;
-            while (!File.Exists(appSettingsFile) && fileRetries < 50)
+            while (!File.Exists(appSettingsFile))
             {
-                await Task.Delay(100);
-                fileRetries++;
+                return -1;
             }
 
             if (!File.Exists(appSettingsFile))

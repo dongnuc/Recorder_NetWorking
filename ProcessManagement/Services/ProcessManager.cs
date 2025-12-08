@@ -68,11 +68,8 @@ namespace ProcessManagement.Services
                 throw new FileNotFoundException($"Executable not found: {exePath}");
             }
 
-            LogManager.Instance.LogInfomation($"🚀 Starting {name} process: {Path.GetFileName(exePath)}");
-
-            // ✅ RESET SNAPSHOT KHI START LẠI
+            //  RESET SNAPSHOT KHI START LẠI
             _previousSnapshots.TryRemove(name, out _);
-            LogManager.Instance.LogDebug($"🔄 Reset snapshot for {name}");
 
             //  Start process
             var (child, mutex) = StartSingle(exePath, name, showConsoleMessages);
@@ -82,7 +79,6 @@ namespace ProcessManagement.Services
 
             await Task.Delay(3000);
 
-            // ✅ START MONITORING CHO CẢ CLIENT VÀ SERVER
             var cts = new CancellationTokenSource();
             StartInputMonitoring(child, mutex, name, cts.Token);
 
@@ -163,7 +159,7 @@ namespace ProcessManagement.Services
                             break;
                         }
 
-                        // ✅ CẢ CLIENT VÀ SERVER ĐỀU CHECK F12
+                        //  CẢ CLIENT VÀ SERVER ĐỀU CHECK F12
                         bool currentEnterState = _keyListener.IsKeyPressed(Constants.VK_F12);
 
                         if (currentEnterState && !lastEnterState)
@@ -171,7 +167,7 @@ namespace ProcessManagement.Services
                             var timeSinceLastTrigger = DateTime.Now - lastTriggerTime;
                             if (timeSinceLastTrigger.TotalMilliseconds > DEBOUNCE_MS)
                             {
-                                // ✅ TRÁNH DUPLICATE PROCESSING
+                                //  TRÁNH DUPLICATE PROCESSING
                                 if (!_isCapturing)
                                 {
                                     _isCapturing = true;
@@ -219,11 +215,9 @@ namespace ProcessManagement.Services
                 bool hasClient = _processHandles.ContainsKey("Client");
                 bool hasServer = _processHandles.ContainsKey("Server");
 
-                // ✅ CASE 1: CẢ CLIENT VÀ SERVER ĐỀU RUNNING → ƯU TIÊN CLIENT
+                //  CASE 1: CẢ CLIENT VÀ SERVER ĐỀU RUNNING → ƯU TIÊN CLIENT
                 if (hasClient && hasServer)
                 {
-                    LogManager.Instance.LogInfomation($"📸 Both processes running - Client first, then Server");
-
                     // 1. Chụp Client trước
                     var clientHandles = _processHandles["Client"];
                     await ExecuteCaptureSequenceAsync(clientHandles.child, clientHandles.mutex, "Client");
@@ -235,17 +229,15 @@ namespace ProcessManagement.Services
                     var serverHandles = _processHandles["Server"];
                     await ExecuteCaptureSequenceAsync(serverHandles.child, serverHandles.mutex, "Server");
                 }
-                // ✅ CASE 2: CHỈ CLIENT RUNNING
+                //  CASE 2: CHỈ CLIENT RUNNING
                 else if (hasClient)
                 {
-                    LogManager.Instance.LogInfomation($"📸 Only Client running - capturing Client");
                     var clientHandles = _processHandles["Client"];
                     await ExecuteCaptureSequenceAsync(clientHandles.child, clientHandles.mutex, "Client");
                 }
-                // ✅ CASE 3: CHỈ SERVER RUNNING
+                //  CASE 3: CHỈ SERVER RUNNING
                 else if (hasServer)
                 {
-                    LogManager.Instance.LogInfomation($"📸 Only Server running - capturing Server");
                     var serverHandles = _processHandles["Server"];
                     await ExecuteCaptureSequenceAsync(serverHandles.child, serverHandles.mutex, "Server");
                 }
@@ -253,8 +245,6 @@ namespace ProcessManagement.Services
                 {
                     LogManager.Instance.LogWarning($"⚠️ No processes running to capture");
                 }
-
-                LogManager.Instance.LogInfomation($"✅ Capture sequence completed");
             }
             finally
             {
@@ -294,14 +284,11 @@ namespace ProcessManagement.Services
 
                 bool isClient = processName.Equals("Client", StringComparison.OrdinalIgnoreCase);
 
-                LogManager.Instance.LogInfomation($"📋 [{processName}] Extracted: [{extractedCapture}]");
-
                 if (isClient)
                 {
                     // first visit when start 
                     if (bufferBefore.Length <= 0 || bufferBefore == null)
                     {
-                        LogManager.Instance.LogInfomation($"✅ First capture for Client - receiving initial output");
                         _testkitManagerService.ReceiveClientOutput(bufferAfterInput);
                     }
                     else
@@ -309,16 +296,14 @@ namespace ProcessManagement.Services
                         var (input, outputClient) = DataInspector.SplitInputFromOutput(extractedCapture);
                         if (!string.IsNullOrEmpty(outputClient))
                         {
-                            // ✅ TẠO STAGE MỚI
                             if (input != null && !string.IsNullOrWhiteSpace(input))
                             {
                                 _testkitManagerService.ReceiveUserInput(input, ActionKeywords.INPUT);
-                                LogManager.Instance.LogInfomation($"✅ New stage created from Client input");
                             }
                             else
                             {
                                 _testkitManagerService.ReceiveUserInput("", "UserInput");
-                                LogManager.Instance.LogWarning($"⚠️ Input is null");
+                                LogManager.Instance.LogWarning($" Input is null");
                             }
                             _testkitManagerService.ReceiveClientOutput(outputClient);
                         }
@@ -326,8 +311,6 @@ namespace ProcessManagement.Services
                 }
                 else
                 {
-                    // ✅ SERVER - VÀO STAGE HIỆN TẠI
-                    LogManager.Instance.LogDebug($"📊 Processing SERVER capture for current stage");
                     if (!string.IsNullOrWhiteSpace(extractedCapture))
                     {
                         var outputSplit = extractedCapture.Split(new[] { "\r\n", "\n", "\r" }, StringSplitOptions.None);
@@ -338,7 +321,6 @@ namespace ProcessManagement.Services
 
                         string outputResult = string.Join(Environment.NewLine, outputLines);
                         _testkitManagerService.ReceiveServerOutput(outputResult);
-                        LogManager.Instance.LogInfomation($"✅ Server output added to current stage");
                     }
                 }
 
@@ -363,7 +345,6 @@ namespace ProcessManagement.Services
                 {
                     cts?.Cancel();
                     cts?.Dispose();
-                    LogManager.Instance.LogDebug($"🛑 Stopped input monitoring for {processName}");
                 }
                 catch (Exception ex)
                 {
@@ -507,7 +488,6 @@ namespace ProcessManagement.Services
                     // Close process
                     CloseSingle(child, mutex, false);
 
-                    LogManager.Instance.LogInfomation("✅ Server process closed and snapshot reset");
                 }
                 else
                 {
