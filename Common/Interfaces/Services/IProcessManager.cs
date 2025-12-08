@@ -29,11 +29,6 @@ namespace Common.Interfaces.Services
             ChildProcess child,
             IntPtr mutex,
             bool showConsoleMessages = false);
-        Task CaptureSnapshotOnlyAsync(
-    ChildProcess child,
-    IntPtr mutex,
-    string processName);
-
         Task CloseClientAsync();
         Task CloseServerAsync();
         #endregion

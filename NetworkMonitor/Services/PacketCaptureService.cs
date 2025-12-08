@@ -49,6 +49,7 @@ namespace NetworkMonitor.Services
             {
                 try
                 {
+                    _device.OnPacketArrival -= Device_OnPacketArrival;
                     _device.StopCapture();
                     _device.Close();
                     _isCapturing = false;
@@ -80,8 +81,11 @@ namespace NetworkMonitor.Services
             }
 
             // Ensure we only attach the handler once
-            device.OnPacketArrival -= Device_OnPacketArrival;
-            device.OnPacketArrival += Device_OnPacketArrival;
+            if (_device != null)
+            {
+                _device.OnPacketArrival -= Device_OnPacketArrival;
+                _device.OnPacketArrival += Device_OnPacketArrival;
+            }
 
             try
             {
