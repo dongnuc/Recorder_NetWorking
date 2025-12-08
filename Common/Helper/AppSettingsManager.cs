@@ -148,6 +148,56 @@ namespace Common.Helper
             }
         }
 
+        public static int? ReadPortFromExePath(string exePath)
+        {
+            try
+            {
+                // Validate exe path
+                if (string.IsNullOrEmpty(exePath) || !File.Exists(exePath))
+                {
+                    LogManager.Instance.LogError($"Exe file not found: {exePath}");
+                    return null;
+                }
+
+                // Get directory containing the exe file
+                string exeDirectory = Path.GetDirectoryName(exePath);
+
+                // Construct appsettings. json path
+                string appSettingsPath = Path.Combine(exeDirectory, "appsettings.json");
+
+                // Check if appsettings.json exists
+                if (!File.Exists(appSettingsPath))
+                {
+                    LogManager.Instance.LogWarning($"appsettings. json not found at: {appSettingsPath}");
+                    return null;
+                }
+
+                // Read and parse JSON file
+                string jsonContent = File.ReadAllText(appSettingsPath);
+                var jsonDocument = JsonDocument.Parse(jsonContent);
+
+                // Try to get Port value from JSON
+                if (jsonDocument.RootElement.TryGetProperty("Port", out JsonElement portElement))
+                {
+                    int port = portElement.GetInt32();
+                    LogManager.Instance.LogInfomation($"Port value read from {appSettingsPath}: {port}");
+                    return port;
+                }
+
+                LogManager.Instance.LogWarning($"Port property not found in {appSettingsPath}");
+                return null;
+            }
+            catch (JsonException jsonEx)
+            {
+                LogManager.Instance.LogError($"Failed to parse JSON: {jsonEx.Message}");
+                return null;
+            }
+            catch (Exception ex)
+            {
+                LogManager.Instance.LogError($"Failed to read port from appsettings: {ex.Message}");
+                return null;
+            }
+        }
 
         #region Backup & Restore
 

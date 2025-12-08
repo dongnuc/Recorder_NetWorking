@@ -1,4 +1,5 @@
-﻿using Common.Interfaces.IOFile;
+﻿using Common.Helper;
+using Common.Interfaces.IOFile;
 using Common.Interfaces.Services;
 using Common.Logging;
 using Common.Models.Entities;
@@ -158,7 +159,7 @@ namespace WpfUI
             _serviceMonitor = new PacketCaptureService(_testkitManagerService,protocol);
             var devices = SharpPcap.CaptureDeviceList.Instance;
 
-            _actualServerPort = await ReadServerActualPortAsync();
+            _actualServerPort = AppSettingsManager.ReadPortFromExePath(_serverPath) ?? -1;
             // fix port 3000
             if(_actualServerPort == -1)
             {
@@ -277,113 +278,6 @@ namespace WpfUI
             });
         }
 
-        #endregion
-
-        #region Helper Methods - Port Reading
-
-        private async Task<int> ReadServerActualPortAsync()
-        {
-            var appSettingsFile = Path.Combine(_serverExecutableDir, "appsettings.json");
-
-            int fileRetries = 0;
-            while (!File.Exists(appSettingsFile))
-            {
-                return -1;
-            }
-
-            if (!File.Exists(appSettingsFile))
-            {
-                LogManager.Instance?.LogError($"❌ Could not find appsettings.json: {appSettingsFile}");
-            }
-
-            try
-            {
-                int parseRetries = 0;
-                int port = -1;
-
-                while (parseRetries < 5)
-                {
-                    try
-                    {
-                        await Task.Delay(200);
-
-                        string jsonContent;
-                        using (var fileStream = new FileStream(appSettingsFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
-                        using (var reader = new StreamReader(fileStream))
-                        {
-                            jsonContent = await reader.ReadToEndAsync();
-                        }
-
-                        LogManager.Instance?.LogDebug($"📄 appsettings.json content:\n{jsonContent}");
-
-                        using (JsonDocument doc = JsonDocument.Parse(jsonContent))
-                        {
-                            JsonElement root = doc.RootElement;
-
-                            if (root.TryGetProperty("Port", out JsonElement portElement))
-                            {
-                                string portText = portElement.GetString();
-
-                                if (int.TryParse(portText, out port))
-                                {
-                                    if (port > 0 && port < 65536)
-                                    {
-                                        LogManager.Instance?.LogInfomation($"✅ Server port read from appsettings.json: {port}");
-                                        return port;
-                                    }
-                                    else
-                                    {
-                                        LogManager.Instance?.LogWarning($"⚠️ Invalid port range: {port}, retrying...");
-                                        parseRetries++;
-                                        continue;
-                                    }
-                                }
-                                else
-                                {
-                                    LogManager.Instance?.LogWarning($"⚠️ Could not parse port: {portText}, retrying...");
-                                    parseRetries++;
-                                    continue;
-                                }
-                            }
-                            else
-                            {
-                                LogManager.Instance?.LogWarning($"⚠️ 'Port' field not found, retrying...");
-                                parseRetries++;
-                                continue;
-                            }
-                        }
-                    }
-                    catch (JsonException ex)
-                    {
-                        LogManager.Instance?.LogWarning($"⚠️ Error parsing JSON (attempt {parseRetries + 1}/5): {ex.Message}");
-                        parseRetries++;
-                        await Task.Delay(300);
-                        continue;
-                    }
-                    catch (IOException ex)
-                    {
-                        LogManager.Instance?.LogWarning($"⚠️ File is locked or being written (attempt {parseRetries + 1}/5): {ex.Message}");
-                        parseRetries++;
-                        await Task.Delay(300);
-                        continue;
-                    }
-                }
-
-                // Nếu vẫn không đọc được sau 5 lần retry
-                if (port <= 0 || port >= 65536)
-                {
-                    LogManager.Instance?.LogError($"❌ Failed to read valid port after {parseRetries} attempts");
-                }
-
-                return port;
-            }
-            catch (Exception ex)
-            {
-                LogManager.Instance?.LogError($"❌ Error reading port from appsettings.json: {ex.Message}");
-                LogManager.Instance?.LogError($"Stack trace: {ex.StackTrace}");
-                throw;
-            }
-        }
         #endregion
 
         #region Event Handlers - Network monitor
