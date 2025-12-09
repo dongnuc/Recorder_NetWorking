@@ -1,10 +1,23 @@
 ﻿using Common.Helper;
+using Common.Interfaces.Logging;
+using Moq;
 
 namespace Common.Tests
 {
     [TestFixture]
     public class DataInspectorTests
     {
+        private Mock<ISystemLogger> _mockLogger;
+        private DataInspector _dataInspector;
+
+        [SetUp]
+        public void Setup()
+        {
+            // Setup mock logger
+            _mockLogger = new Mock<ISystemLogger>();
+            _dataInspector = new DataInspector(_mockLogger.Object);
+        }
+
         /// <summary>
         /// Test Case 1: Console đứng yên (Polling).
         /// Mô phỏng: Tool quét console liên tục nhưng không có gì mới xuất hiện.
@@ -20,7 +33,7 @@ namespace Common.Tests
             string after = "[INFO] Server started at port 8080...\n[INFO] Waiting for connections...";
 
             // Act
-            string result = DataInspector.ExtractDifference(before, after);
+            string result = _dataInspector.ExtractDifference(before, after);
 
             // Assert
             Assert.That(result, Is.EqualTo(string.Empty));
@@ -41,11 +54,12 @@ namespace Common.Tests
             string after = "Server Ready.\n[Request] GET /api/users\n[Response] 200 OK";
 
             // Act
-            string result = DataInspector.ExtractDifference(before, after);
+            string result = _dataInspector.ExtractDifference(before, after);
 
             // Assert
             // Chú ý: Ký tự xuống dòng ở đầu chuỗi kết quả vì nó nối tiếp vào chuỗi cũ
             Assert.That(result, Is.EqualTo("\n[Request] GET /api/users\n[Response] 200 OK"));
+            _mockLogger.Verify(x => x.LogInfomation(It.IsAny<string>()), Times.Once);
         }
 
         /// <summary>
@@ -63,10 +77,11 @@ namespace Common.Tests
             string after = "Please enter username: admin";
 
             // Act
-            string result = DataInspector.ExtractDifference(before, after);
+            string result = _dataInspector.ExtractDifference(before, after);
 
             // Assert
             Assert.That(result, Is.EqualTo("admin"));
+            _mockLogger.Verify(x => x.LogInfomation(It.Is<string>(s => s == "admin")), Times.Once);
         }
 
         /// <summary>
@@ -84,7 +99,7 @@ namespace Common.Tests
             string after = "=== MAIN MENU ===\n1. Start\n2. Exit";
 
             // Act
-            string result = DataInspector.ExtractDifference(before, after);
+            string result = _dataInspector.ExtractDifference(before, after);
 
             // Assert
             Assert.That(result, Is.EqualTo(after));
@@ -105,10 +120,11 @@ namespace Common.Tests
             string after = "Microsoft Windows [Version 10.0.19045]\n(c) Microsoft Corporation.";
 
             // Act
-            string result = DataInspector.ExtractDifference(before, after);
+            string result = _dataInspector.ExtractDifference(before, after);
 
             // Assert
             Assert.That(result, Is.EqualTo(after));
+            _mockLogger.Verify(x => x.LogInfomation(It.Is<string>(s => s == after)), Times.Once);
         }
 
         /// <summary>
@@ -127,7 +143,7 @@ namespace Common.Tests
             string after = "Update Complete.";
 
             // Act
-            string result = DataInspector.ExtractDifference(before, after);
+            string result = _dataInspector.ExtractDifference(before, after);
 
             // Assert
             Assert.That(result, Is.EqualTo(after));
@@ -148,7 +164,7 @@ namespace Common.Tests
             string after = "";
 
             // Act
-            string result = DataInspector.ExtractDifference(before, after);
+            string result = _dataInspector.ExtractDifference(before, after);
 
             // Assert
             Assert.That(result, Is.EqualTo(string.Empty));

@@ -2,8 +2,8 @@
 using Common.Helper.Kernel32API;
 using Common.Helper.Kernel32API.Implement;
 using Common.Helper.Kernel32API.Interface;
+using Common.Interfaces.Logging;
 using Common.Interfaces.Services;
-using Common.Logging;
 using Common.Resources;
 using System.Collections.Concurrent;
 
@@ -20,13 +20,11 @@ namespace ProcessManagement.Services
         private readonly IConsoleManager _consoleManager;
         private readonly IProcessWaiter _processWaiter;
         private readonly ITestkitManagerService _testkitManagerService;
+        private readonly ISystemLogger _logger;
 
         private readonly ConcurrentDictionary<string, CancellationTokenSource> _monitoringTasks = new();
-
         private readonly ConcurrentDictionary<string, (ChildProcess child, IntPtr mutex)> _processHandles = new();
-
         private readonly ConcurrentDictionary<string, string> _previousSnapshots = new();
-
         private readonly SemaphoreSlim _captureLock = new SemaphoreSlim(1, 1);
 
         private volatile bool _isCapturing = false;
@@ -36,7 +34,7 @@ namespace ProcessManagement.Services
         #region Constructor
 
         /// <summary>
-        /// ✅ REFACTORED: Constructor with full Dependency Injection
+        /// ✅ REFACTORED: Constructor with full Dependency Injection including ISystemLogger
         /// </summary>
         public ProcessManager(
             ITestkitManagerService testkitManagerService,
@@ -45,7 +43,8 @@ namespace ProcessManagement.Services
             IKeyListener keyListener,
             IMutexManager mutexManager,
             IConsoleManager consoleManager,
-            IProcessWaiter processWaiter)
+            IProcessWaiter processWaiter,
+            ISystemLogger logger)
         {
             _testkitManagerService = testkitManagerService ?? throw new ArgumentNullException(nameof(testkitManagerService));
             _processStarter = processStarter ?? throw new ArgumentNullException(nameof(processStarter));
@@ -54,11 +53,13 @@ namespace ProcessManagement.Services
             _mutexManager = mutexManager ?? throw new ArgumentNullException(nameof(mutexManager));
             _consoleManager = consoleManager ?? throw new ArgumentNullException(nameof(consoleManager));
             _processWaiter = processWaiter ?? throw new ArgumentNullException(nameof(processWaiter));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
         #endregion
 
         #region Start Single Process 
+
         /// <param name="exePath">Path to executable</param>
         /// <param name="name">Process name (e.g., "Client" or "Server")</param>
         /// <param name="isClient">True if client, false if server</param>
@@ -72,7 +73,7 @@ namespace ProcessManagement.Services
         {
             if (!File.Exists(exePath))
             {
-                LogManager.Instance.LogError($"Executable not found: {exePath}");
+                _logger.LogError($"Executable not found: {exePath}");
                 throw new FileNotFoundException($"Executable not found: {exePath}");
             }
 
@@ -103,7 +104,7 @@ namespace ProcessManagement.Services
             string name,
             bool showConsoleMessages = false)
         {
-            LogManager.Instance.LogInfomation($" Stopping {name} process...");
+            _logger.LogInfomation($" Stopping {name} process...");
 
             try
             {
@@ -121,11 +122,11 @@ namespace ProcessManagement.Services
                 // Dispose
                 cts?.Dispose();
 
-                LogManager.Instance.LogInfomation($" {name} process stopped");
+                _logger.LogInfomation($" {name} process stopped");
             }
             catch (Exception ex)
             {
-                LogManager.Instance.LogError($"Error stopping {name}: {ex.Message}");
+                _logger.LogError($"Error stopping {name}: {ex.Message}");
             }
 
             await Task.CompletedTask;
@@ -202,7 +203,7 @@ namespace ProcessManagement.Services
                     }
                     catch (Exception ex)
                     {
-                        LogManager.Instance.LogError($"Error in input monitoring for {processName}: {ex.Message}");
+                        _logger.LogError($"Error in input monitoring for {processName}: {ex.Message}");
                         await Task.Delay(1000, cts.Token);
                     }
                 }
@@ -279,7 +280,8 @@ namespace ProcessManagement.Services
                 );
 
                 // Extract input value
-                string extractedCapture = DataInspector.ExtractDifference(
+                var dataInspector = new DataInspector(_logger);
+                string extractedCapture = dataInspector.ExtractDifference(
                     bufferBefore,
                     bufferAfterInput
                 );
@@ -305,7 +307,7 @@ namespace ProcessManagement.Services
                             else
                             {
                                 _testkitManagerService.ReceiveUserInput("", "UserInput");
-                                LogManager.Instance.LogWarning($" Input is null");
+                                _logger.LogWarning($" Input is null");
                             }
                             _testkitManagerService.ReceiveClientOutput(outputClient);
                         }
@@ -330,8 +332,8 @@ namespace ProcessManagement.Services
             }
             catch (Exception ex)
             {
-                LogManager.Instance.LogError($"❌ Error in capture sequence for {processName}: {ex.Message}");
-                LogManager.Instance.LogError($"Stack trace: {ex.StackTrace}");
+                _logger.LogError($"❌ Error in capture sequence for {processName}: {ex.Message}");
+                _logger.LogError($"Stack trace: {ex.StackTrace}");
             }
         }
 
@@ -349,7 +351,7 @@ namespace ProcessManagement.Services
                 }
                 catch (Exception ex)
                 {
-                    LogManager.Instance.LogError($"Error stopping input monitoring: {ex.Message}");
+                    _logger.LogError($"Error stopping input monitoring: {ex.Message}");
                 }
             }
         }
@@ -406,7 +408,7 @@ namespace ProcessManagement.Services
             }
             catch (Exception ex)
             {
-                LogManager.Instance.LogError($"Error closing process {child.name}: {ex.Message}");
+                _logger.LogError($"Error closing process {child.name}: {ex.Message}");
             }
         }
 
@@ -456,12 +458,12 @@ namespace ProcessManagement.Services
                 }
                 else
                 {
-                    LogManager.Instance.LogWarning("⚠️ Client process not found");
+                    _logger.LogWarning("⚠️ Client process not found");
                 }
             }
             catch (Exception ex)
             {
-                LogManager.Instance.LogError($"❌ Error closing Client: {ex.Message}");
+                _logger.LogError($"❌ Error closing Client: {ex.Message}");
                 throw;
             }
 
@@ -491,12 +493,12 @@ namespace ProcessManagement.Services
                 }
                 else
                 {
-                    LogManager.Instance.LogWarning("⚠️ Server process not found");
+                    _logger.LogWarning("⚠️ Server process not found");
                 }
             }
             catch (Exception ex)
             {
-                LogManager.Instance.LogError($"❌ Error closing Server: {ex.Message}");
+                _logger.LogError($"❌ Error closing Server: {ex.Message}");
                 throw;
             }
 

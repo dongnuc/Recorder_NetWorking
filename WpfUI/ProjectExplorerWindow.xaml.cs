@@ -1,20 +1,12 @@
-﻿using System;
+﻿using Common.Interfaces.IOFile;
+using Common.Interfaces.Logging;
+using Microsoft.Win32;
+using System.Collections.Specialized;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using WpfUI.Properties;
-using System.IO;
 using WpfUI.ViewModels;
-using FileManagement.FolderHelper;
-using FileManagement.FileHelper;
-using FileManagement.FileHelper.FileHandler;
-using Common.Interfaces.IOFile;
-using Microsoft.Win32;
-using Microsoft.Extensions.DependencyInjection;
-using WpfUI.Services;
-using Common.Interfaces.Services;
-using System.Collections.Specialized;
-using System.Collections.Generic; 
-using System.Linq; 
 
 namespace WpfUI
 {
@@ -31,6 +23,7 @@ namespace WpfUI
         private readonly IOFileHandler _fileHandler;
         private readonly IOFileManagement _fileManager;
         private readonly IServiceProvider _serviceProvider;
+        private readonly ISystemLogger _logger;
 
         private bool _isNavigatingToMainMenu = false;
 
@@ -38,14 +31,16 @@ namespace WpfUI
             IServiceProvider serviceProvider,
             IOFolderHandler folderHandler,
             IOFileHandler fileHandler,
-            IOFileManagement fileManager)
+            IOFileManagement fileManager,
+            ISystemLogger logger)
         {
             InitializeComponent();
 
-            _serviceProvider = serviceProvider;
-            _folderHandler = folderHandler;
-            _fileHandler = fileHandler;
-            _fileManager = fileManager;
+            _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
+            _folderHandler = folderHandler ?? throw new ArgumentNullException(nameof(folderHandler));
+            _fileHandler = fileHandler ?? throw new ArgumentNullException(nameof(fileHandler));
+            _fileManager = fileManager ?? throw new ArgumentNullException(nameof(fileManager));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
             LoadRecentProject("");
         }
@@ -78,7 +73,8 @@ namespace WpfUI
                     DateTime lastWrite = Directory.GetLastWriteTime(path);
                     string name = System.IO.Path.GetFileName(path);
 
-                    if (string.IsNullOrEmpty(filter) || name.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0)
+                    if (string.IsNullOrEmpty(filter) || 
+                        name.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0)
                     {
                         items.Add(new RecentProjectItem
                         {
@@ -127,21 +123,23 @@ namespace WpfUI
             e.Handled = true;
         }
 
-
         private void AddToRecentProjects(string projectPath)
         {
             if (string.IsNullOrEmpty(projectPath)) return;
-            if (Settings.Default.RecentProjects == null) Settings.Default.RecentProjects = new StringCollection();
-            if (Settings.Default.RecentProjects.Contains(projectPath)) Settings.Default.RecentProjects.Remove(projectPath);
+            if (Settings.Default.RecentProjects == null) 
+                Settings.Default.RecentProjects = new StringCollection();
+            if (Settings.Default.RecentProjects.Contains(projectPath)) 
+                Settings.Default.RecentProjects.Remove(projectPath);
             Settings.Default.RecentProjects.Insert(0, projectPath);
-            while (Settings.Default.RecentProjects.Count > 10) Settings.Default.RecentProjects.RemoveAt(10);
+            while (Settings.Default.RecentProjects.Count > 10) 
+                Settings.Default.RecentProjects.RemoveAt(10);
             Settings.Default.ProjectPath = projectPath;
             Settings.Default.Save();
         }
 
         private void BtnCreateNew_Click(object sender, RoutedEventArgs e)
         {
-            var setupWindow = new ProjectSetupWindow(_fileHandler, _serviceProvider, _fileManager);
+            var setupWindow = new ProjectSetupWindow(_fileHandler, _serviceProvider, _fileManager,_logger);
             this.Hide();
             setupWindow.ShowDialog();
             if (setupWindow.ProjectCreatedSuccessfully)
@@ -150,7 +148,10 @@ namespace WpfUI
                 AddToRecentProjects(newPath);
                 OpenMainMenu(setupWindow.ViewModel);
             }
-            else { this.Show(); }
+            else 
+            { 
+                this.Show(); 
+            }
         }
 
         private void BtnOpenFolder_Click(object sender, RoutedEventArgs e)
@@ -195,7 +196,7 @@ namespace WpfUI
 
         private void OpenMainMenu(string projectRootPath)
         {
-            var mainViewModel = new MainMenuViewModel(_folderHandler, _fileHandler, projectRootPath);
+            var mainViewModel = new MainMenuViewModel(_folderHandler, _fileHandler, projectRootPath, _logger);
             OpenMainMenu(mainViewModel);
         }
 
@@ -203,7 +204,7 @@ namespace WpfUI
         {
             _isNavigatingToMainMenu = true;
             this.Hide();
-            var mainMenu = new MainMenu(viewModel, _fileHandler, _serviceProvider, _fileManager);
+            var mainMenu = new MainMenu(viewModel, _fileHandler, _serviceProvider, _fileManager, _logger);
             mainMenu.Closed += MainMenu_Closed;
             mainMenu.Show();
         }

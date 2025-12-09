@@ -1,6 +1,4 @@
-﻿using Common.Helper;
-using Common.Logging;
-using Microsoft.Win32;
+﻿using Microsoft.Win32;
 using System.IO;
 using System.Windows;
 
@@ -11,7 +9,6 @@ namespace WpfUI
         public MainWindow()
         {
             InitializeComponent();
-            LogManager.Instance.LogInfomation("🚀 UITestKit started");
         }
 
         #region Browse EXE Files
@@ -27,7 +24,6 @@ namespace WpfUI
             if (dialog.ShowDialog() == true)
             {
                 TxtClientPath.Text = dialog.FileName;
-                LogManager.Instance.LogDebug($"Client path selected: {dialog.FileName}");
             }
         }
 
@@ -42,7 +38,6 @@ namespace WpfUI
             if (dialog.ShowDialog() == true)
             {
                 TxtServerPath.Text = dialog.FileName;
-                LogManager.Instance.LogDebug($"Server path selected: {dialog.FileName}");
             }
         }
 
@@ -72,14 +67,12 @@ namespace WpfUI
                 bool useHttp = RbHttp.IsChecked == true;
 
                 TxtStatus.Text = "✅ Recording started successfully!";
-                LogManager.Instance.LogInfomation($"✅ Recording started - Test Case: {testCaseName}");
 
                 // Minimize this window
                 this.WindowState = WindowState.Minimized;
             }
             catch (Exception ex)
             {
-                LogManager.Instance.LogError($"Failed to start recording: {ex.Message}");
                 MessageBox.Show(
                     $"Failed to start recording:\n\n{ex.Message}\n\nCheck log for details.",
                     "Error",

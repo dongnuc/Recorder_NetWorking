@@ -1,4 +1,4 @@
-﻿using Common.Logging;
+﻿using Common.Interfaces.Logging;
 using System.Text;
 using System.Text.Json;
 using System.Xml;
@@ -7,6 +7,13 @@ namespace Common.Helper
 {
     public class DataInspector
     {
+        private readonly ISystemLogger _logger;
+
+        public DataInspector(ISystemLogger logger)
+        {
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        }
+
         public static string DetecDataType(byte[] data)
         {
             if (data == null || data.Length == 0)
@@ -101,9 +108,8 @@ namespace Common.Helper
             return true;
         }
 
-        public static string ExtractDifference(string before, string after)
+        public string ExtractDifference(string before, string after)
         {
-
             // Handle empty cases
             if (string.IsNullOrEmpty(after))
             {
@@ -112,7 +118,7 @@ namespace Common.Helper
 
             if (string.IsNullOrEmpty(before))
             {
-                LogManager.Instance.LogInfomation(after);
+                _logger.LogInfomation(after);
                 return after;
             }
 
@@ -126,7 +132,7 @@ namespace Common.Helper
                 // Extract new content
                 string newContent = afterTrimmed.Substring(beforeTrimmed.Length);
 
-                LogManager.Instance.LogInfomation(newContent);
+                _logger.LogInfomation(newContent);
 
                 return newContent;
             }
@@ -140,16 +146,12 @@ namespace Common.Helper
             }
         }
 
-        /// <summary>
-        ///  Extract input với better logging
-        /// </summary>
-        public static string ExtractInputFromLastLine(string before, string after)
+        public string ExtractInputFromLastLine(string before, string after)
         {
-
             string afterTrimmed = (after ?? string.Empty).TrimEnd();
             if (afterTrimmed.Length == 0)
             {
-                LogManager.Instance.LogDebug("⚠️ AFTER is empty");
+                _logger.LogDebug("⚠️ AFTER is empty");
                 return string.Empty;
             }
 
@@ -162,19 +164,19 @@ namespace Common.Helper
                 if (lines.Length > 0)
                 {
                     string lastLine = lines[lines.Length - 1].Trim();
-                    LogManager.Instance.LogDebug($"Case 1: Last line from AFTER: [{lastLine}]");
+                    _logger.LogDebug($"Case 1: Last line from AFTER: [{lastLine}]");
 
                     // ✅ Extract after colon
                     int colon = lastLine.LastIndexOf(':');
                     if (colon >= 0 && colon + 1 < lastLine.Length)
                     {
                         string input = lastLine.Substring(colon + 1).Trim();
-                        LogManager.Instance.LogDebug($"✅ Extracted (after colon): [{input}]");
+                        _logger.LogDebug($"✅ Extracted (after colon): [{input}]");
                         return input;
                     }
 
                     // ✅ Return full last line if no colon
-                    LogManager.Instance.LogDebug($"✅ Extracted (full line): [{lastLine}]");
+                    _logger.LogDebug($"✅ Extracted (full line): [{lastLine}]");
                     return lastLine;
                 }
 
@@ -186,7 +188,7 @@ namespace Common.Helper
                 afterTrimmed.StartsWith(beforeTrimmed, StringComparison.Ordinal))
             {
                 string diff = afterTrimmed.Substring(beforeTrimmed.Length);
-                LogManager.Instance.LogDebug($"Case 2: Difference: [{diff}]");
+                _logger.LogDebug($"Case 2: Difference: [{diff}]");
 
                 // ✅ Split difference into lines
                 var diffLines = diff.Split(new[] { Environment.NewLine, "\n", "\r" }, StringSplitOptions.RemoveEmptyEntries);
@@ -195,13 +197,13 @@ namespace Common.Helper
                 {
                     // ✅ Get FIRST non-empty line (this is user input)
                     string firstLine = diffLines[0].Trim();
-                    LogManager.Instance.LogDebug($"✅ Extracted (first line of diff): [{firstLine}]");
+                    _logger.LogDebug($"✅ Extracted (first line of diff): [{firstLine}]");
                     return firstLine;
                 }
 
                 // ✅ If diff has no newline, return trimmed diff
                 string trimmedDiff = diff.Trim();
-                LogManager.Instance.LogDebug($"✅ Extracted (trimmed diff): [{trimmedDiff}]");
+                _logger.LogDebug($"✅ Extracted (trimmed diff): [{trimmedDiff}]");
                 return trimmedDiff;
             }
 
@@ -210,22 +212,21 @@ namespace Common.Helper
             if (afterLines.Length > 0)
             {
                 string lastLine = afterLines[afterLines.Length - 1].Trim();
-                LogManager.Instance.LogDebug($"Case 3: Last line from AFTER: [{lastLine}]");
+                _logger.LogDebug($"Case 3: Last line from AFTER: [{lastLine}]");
 
                 int colon = lastLine.LastIndexOf(':');
                 if (colon >= 0 && colon + 1 < lastLine.Length)
                 {
                     string input = lastLine.Substring(colon + 1).Trim();
-                    LogManager.Instance.LogDebug($"✅ Extracted (after colon): [{input}]");
+                    _logger.LogDebug($"✅ Extracted (after colon): [{input}]");
                     return input;
                 }
 
-                LogManager.Instance.LogDebug($"✅ Extracted (last line): [{lastLine}]");
+                _logger.LogDebug($"✅ Extracted (last line): [{lastLine}]");
                 return lastLine;
             }
 
-            LogManager.Instance.LogDebug("⚠️ Could not extract input");
-            LogManager.Instance.LogDebug("🔍 ===== ExtractInputFromLastLine END =====");
+            _logger.LogDebug("⚠️ Could not extract input");
             return string.Empty;
         }
 

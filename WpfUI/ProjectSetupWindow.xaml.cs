@@ -1,5 +1,5 @@
 ﻿using Common.Interfaces.IOFile;
-using Common.Logging;
+using Common.Interfaces.Logging;
 using FileManagement.FolderHelper;
 using Microsoft.Win32;
 using OfficeOpenXml;
@@ -16,14 +16,15 @@ namespace WpfUI
         private readonly IOFileHandler _fileHandler;
         private readonly IServiceProvider _serviceProvider; 
         private readonly IOFileManagement _fileManagement;
-
+        private readonly ISystemLogger _logger;
         public bool ProjectCreatedSuccessfully { get; private set; } = false;
         public MainMenuViewModel ViewModel { get; private set; }
 
         public ProjectSetupWindow(
             IOFileHandler fileHandler,
             IServiceProvider serviceProvider,
-            IOFileManagement fileManagement)
+            IOFileManagement fileManagement,
+            ISystemLogger logger)
         {
             InitializeComponent();
             ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
@@ -32,8 +33,7 @@ namespace WpfUI
             _fileHandler = fileHandler;
             _serviceProvider = serviceProvider;
             _fileManagement = fileManagement;
-
-            LogManager.Instance.LogInfomation("🚀 ProjectSetupWindow opened");
+            _logger = logger;
             LoadSettings();
         }
 
@@ -88,22 +88,23 @@ namespace WpfUI
                         BtnCreateProject.IsEnabled = true;
                         return;
                     }
-                    LogManager.Instance.LogInfomation($"Opening existing project at: {projectRoot}");
+                    _logger.LogInfomation($"Opening existing project at: {projectRoot}");
                 }
                 else
                 {
                     _folderHandler.CreateDirectory(basePath, projectName);
-                    LogManager.Instance.LogInfomation($"Project root created at: {projectRoot}");
+                    _logger.LogInfomation($"Project root created at: {projectRoot}");
                 }
 
                 Settings.Default.ProjectPath = projectRoot;
                 Settings.Default.Save();
-                LogManager.Instance.LogInfomation($"Settings saved (ProjectPath).");
+                _logger.LogInfomation($"Settings saved (ProjectPath).");
 
                 this.ViewModel = new MainMenuViewModel(
                     _folderHandler,
                     _fileHandler,
-                    projectRoot
+                    projectRoot,
+                    _logger
                 );
 
                 this.ProjectCreatedSuccessfully = true;
@@ -112,7 +113,7 @@ namespace WpfUI
             }
             catch (Exception ex)
             {
-                LogManager.Instance.LogError($"Failed to create/open project: {ex.Message}");
+                _logger.LogError($"Failed to create/open project: {ex.Message}");
                 MessageBox.Show($"Failed to create/open project: {ex.Message}", "Error");
                 BtnCreateProject.IsEnabled = true;
             }

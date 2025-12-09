@@ -1,4 +1,5 @@
 ﻿// WpfUI/Controls/LogViewerControl.xaml.cs
+using Common.Interfaces.Logging;
 using Common.Logging;
 using Common.Models.Entities;
 using System.Collections.ObjectModel;
@@ -11,9 +12,30 @@ namespace WpfUI.Controls
     public partial class LogViewerControl : UserControl
     {
         private readonly ObservableCollection<LogEntryViewModel> _displayedLogs = new ObservableCollection<LogEntryViewModel>();
+        private LogManager? _logManager;
         private LogLevel? _selectedLogLevel = null;
         private string _searchKeyword = string.Empty;
 
+        /// <summary>
+        /// Constructor with dependency injection for LogManager
+        /// </summary>
+        public LogViewerControl(ISystemLogger logger)
+        {
+            InitializeComponent();
+
+            // Bind ListView
+            LstLogs.ItemsSource = _displayedLogs;
+
+            // Cast ISystemLogger to LogManager to access event and specific features
+            var logManager = logger as LogManager ?? throw new ArgumentException("Logger must be LogManager instance", nameof(logger));
+
+            InitializeLogManager(logManager);
+        }
+
+        /// <summary>
+        /// Parameterless constructor for XAML designer ONLY
+        /// DO NOT USE in production code - use DI constructor instead
+        /// </summary>
         public LogViewerControl()
         {
             InitializeComponent();
@@ -21,19 +43,55 @@ namespace WpfUI.Controls
             // Bind ListView
             LstLogs.ItemsSource = _displayedLogs;
 
+            // For design-time only - will be replaced by DI in runtime
+            if (System.ComponentModel.DesignerProperties.GetIsInDesignMode(this))
+            {
+                // Create a temporary instance for designer
+                InitializeLogManager(new LogManager());
+            }
+            else
+            {
+                // This should not happen in production - log a warning
+                Debug.WriteLine("⚠️ WARNING: LogViewerControl created without logger injection!");
+                // Create fallback instance
+                InitializeLogManager(new LogManager());
+            }
+        }
+
+        /// <summary>
+        /// Common initialization logic for LogManager
+        /// </summary>
+        private void InitializeLogManager(LogManager logManager)
+        {
+            _logManager = logManager ?? throw new ArgumentNullException(nameof(logManager));
+
             // Load existing logs
             LoadExistingLogs();
 
             // Subscribe to new log events
-            LogManager.Instance.OnLogAdded += OnLogAdded;
+            _logManager.OnLogAdded += OnLogAdded;
 
             // Unsubscribe when unloaded
-            Unloaded += (s, e) => LogManager.Instance.OnLogAdded -= OnLogAdded;
+            Unloaded += OnUnloaded;
 
-            // Show log file path
-            TxtLogFilePath.Text = $"📄 {System.IO.Path.GetFileName(LogManager.Instance.LogFilePath)}";
+            // Show log file path and session info
+            if (TxtLogFilePath != null)
+            {
+                TxtLogFilePath.Text = $"📄 {System.IO.Path.GetFileName(_logManager.LogFilePath)} (Session: {_logManager.SessionId})";
+            }
 
             UpdateLogCount();
+        }
+
+        /// <summary>
+        /// Cleanup event subscriptions
+        /// </summary>
+        private void OnUnloaded(object sender, RoutedEventArgs e)
+        {
+            if (_logManager is not null)
+            {
+                _logManager.OnLogAdded -= OnLogAdded;
+            }
         }
 
         /// <summary>
@@ -41,7 +99,13 @@ namespace WpfUI.Controls
         /// </summary>
         private void LoadExistingLogs()
         {
-            var existingLogs = LogManager.Instance.GetAllLogs();
+            if (_logManager is null)
+            {
+                Debug.WriteLine("⚠️ LogManager is null in LoadExistingLogs");
+                return;
+            }
+
+            var existingLogs = _logManager.GetAllLogs();
             foreach (var log in existingLogs)
             {
                 AddLogToDisplay(log);
@@ -101,6 +165,12 @@ namespace WpfUI.Controls
 
         private void BtnClearLogs_Click(object sender, RoutedEventArgs e)
         {
+            if (_logManager is null)
+            {
+                MessageBox.Show("LogManager is not initialized.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
             var result = MessageBox.Show(
                 "Clear all logs?\n\nThis will clear displayed logs and memory cache.",
                 "Confirm",
@@ -110,7 +180,7 @@ namespace WpfUI.Controls
             if (result == MessageBoxResult.Yes)
             {
                 _displayedLogs.Clear();
-                LogManager.Instance.ClearLogs();
+                _logManager.ClearLogs();
                 if (TxtStatus != null)
                 {
                     TxtStatus.Text = "✅ Logs cleared";
@@ -123,7 +193,7 @@ namespace WpfUI.Controls
         {
             if (CmbLogLevel?.SelectedItem is ComboBoxItem selectedItem)
             {
-                string tag = selectedItem.Tag?.ToString();
+                string? tag = selectedItem.Tag?.ToString();
 
                 _selectedLogLevel = tag switch
                 {
@@ -153,12 +223,18 @@ namespace WpfUI.Controls
 
         private void BtnOpenLogFile_Click(object sender, RoutedEventArgs e)
         {
+            if (_logManager is null)
+            {
+                MessageBox.Show("LogManager is not initialized.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
             try
             {
                 Process.Start(new ProcessStartInfo
                 {
                     FileName = "notepad.exe",
-                    Arguments = LogManager.Instance.LogFilePath,
+                    Arguments = _logManager.LogFilePath,
                     UseShellExecute = true
                 });
             }

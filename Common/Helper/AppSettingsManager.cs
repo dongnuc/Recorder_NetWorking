@@ -1,4 +1,4 @@
-﻿using Common.Logging;
+﻿using Common.Interfaces.Logging;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
@@ -8,9 +8,10 @@ namespace Common.Helper
     {
         private readonly string _filePath;
         private readonly JsonSerializerOptions _jsonOptions;
+        private readonly ISystemLogger _logger;
 
         #region Constructor
-        public AppSettingsManager(string filePath)
+        public AppSettingsManager(string filePath, ISystemLogger logger)
         {
             if (string.IsNullOrWhiteSpace(filePath))
                 throw new ArgumentException("File path cannot be null or empty", nameof(filePath));
@@ -19,6 +20,7 @@ namespace Common.Helper
                 throw new FileNotFoundException($"AppSettings file not found: {filePath}");
 
             _filePath = filePath;
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
             _jsonOptions = new JsonSerializerOptions
             {
@@ -58,14 +60,14 @@ namespace Common.Helper
             {
                 if (IsFileLocked(_filePath))
                 {
-                    LogManager.Instance.LogError($"   File is locked: {_filePath}");
-                    LogManager.Instance.LogError($"   Close any applications using this file");
+                    _logger.LogError($"   File is locked: {_filePath}");
+                    _logger.LogError($"   Close any applications using this file");
                     return false;
                 }
                 // Validate port
                 if (newPort < 1 || newPort > 65535)
                 {
-                    LogManager.Instance.LogError($"Invalid port number: {newPort}. Must be between 1-65535.");
+                    _logger.LogError($"Invalid port number: {newPort}. Must be between 1-65535.");
                     return false;
                 }
 
@@ -81,7 +83,7 @@ namespace Common.Helper
 
                 if (jsonNode == null)
                 {
-                    LogManager.Instance.LogError("Failed to parse JSON content");
+                    _logger.LogError("Failed to parse JSON content");
                     return false;
                 }
 
@@ -92,7 +94,7 @@ namespace Common.Helper
                 }
                 else
                 {
-                    LogManager.Instance.LogWarning("Port field not found in JSON, adding it");
+                    _logger.LogWarning("Port field not found in JSON, adding it");
                     jsonNode["Port"] = newPort.ToString();
                 }
 
@@ -104,51 +106,51 @@ namespace Common.Helper
             }
             catch (Exception ex)
             {
-                LogManager.Instance.LogError($"Failed to update Port: {ex.Message}");
+                _logger.LogError($"Failed to update Port: {ex.Message}");
                 return false;
             }
         }
         #endregion
-        public static bool UpdateAppSettings(string clientPath, int clientPort, string serverPath, int serverPort)
+        public static bool UpdateAppSettings(string clientPath, int clientPort, string serverPath, int serverPort, ISystemLogger logger)
         {
             try
             {
                 // Get or create appsettings.json for client
-                string clientAppSettings = AppSettingsPathResolver.GetAppSettingsPath(clientPath);
+                string clientAppSettings = AppSettingsPathResolver.GetAppSettingsPath(clientPath, logger);
                 if (string.IsNullOrEmpty(clientAppSettings))
                 {
-                    LogManager.Instance.LogWarning("Client appsettings.json not found, creating default...");
+                    logger.LogWarning("Client appsettings.json not found, creating default...");
                 }
                 else
                 {
-                    var clientManager = new AppSettingsManager(clientAppSettings);
+                    var clientManager = new AppSettingsManager(clientAppSettings, logger);
                     clientManager.UpdatePort(clientPort, createBackup: true);
-                    LogManager.Instance.LogInfomation($" Client appsettings updated - Port: {clientPort}");
+                    logger.LogInfomation($" Client appsettings updated - Port: {clientPort}");
                 }
 
                 // Get or create appsettings.json for server
-                string serverAppSettings = AppSettingsPathResolver.GetAppSettingsPath(serverPath);
+                string serverAppSettings = AppSettingsPathResolver.GetAppSettingsPath(serverPath, logger);
                 if (string.IsNullOrEmpty(serverAppSettings))
                 {
-                    LogManager.Instance.LogWarning("Server appsettings.json not found, creating default...");
+                    logger.LogWarning("Server appsettings.json not found, creating default...");
                 }
                 else
                 {
-                    var serverManager = new AppSettingsManager(serverAppSettings);
+                    var serverManager = new AppSettingsManager(serverAppSettings, logger);
                     serverManager.UpdatePort(serverPort, createBackup: false);
-                    LogManager.Instance.LogInfomation($"Server appsettings updated - Port: {serverPort}");
+                    logger.LogInfomation($"Server appsettings updated - Port: {serverPort}");
                 }
 
                 return true;
             }
             catch (Exception ex)
             {
-                LogManager.Instance.LogError($"Failed to update appsettings: {ex.Message}");
+                logger.LogError($"Failed to update appsettings: {ex.Message}");
                 return false;
             }
         }
 
-        public static int? ReadPortFromExePath(string exePath)
+        public static int? ReadPortFromExePath(string exePath, ISystemLogger logger)
         {
             if (!File.Exists(exePath)) throw new FileNotFoundException("Exe not found", exePath);
 
@@ -162,7 +164,7 @@ namespace Common.Helper
                 // Check if appsettings.json exists
                 if (!File.Exists(appSettingsPath))
                 {
-                    LogManager.Instance.LogWarning($"appsettings. json not found at: {appSettingsPath}");
+                    logger.LogWarning($"appsettings. json not found at: {appSettingsPath}");
                     return null;
                 }
 
@@ -174,21 +176,21 @@ namespace Common.Helper
                 if (jsonDocument.RootElement.TryGetProperty("Port", out JsonElement portElement))
                 {
                     int port = portElement.GetInt32();
-                    LogManager.Instance.LogInfomation($"Port value read from {appSettingsPath}: {port}");
+                    logger.LogInfomation($"Port value read from {appSettingsPath}: {port}");
                     return port;
                 }
 
-                LogManager.Instance.LogWarning($"Port property not found in {appSettingsPath}");
+                logger.LogWarning($"Port property not found in {appSettingsPath}");
                 return null;
             }
             catch (JsonException jsonEx)
             {
-                LogManager.Instance.LogError($"Failed to parse JSON: {jsonEx.Message}");
+                logger.LogError($"Failed to parse JSON: {jsonEx.Message}");
                 return null;
             }
             catch (Exception ex)
             {
-                LogManager.Instance.LogError($"Failed to read port from appsettings: {ex.Message}");
+                logger.LogError($"Failed to read port from appsettings: {ex.Message}");
                 return null;
             }
         }
@@ -205,12 +207,12 @@ namespace Common.Helper
                 string backupPath = $"{_filePath}.backup_{DateTime.Now:yyyyMMdd_HHmmss}";
                 File.Copy(_filePath, backupPath, overwrite: true);
 
-                LogManager.Instance.LogInfomation($" Backup created: {Path.GetFileName(backupPath)}");
+                _logger.LogInfomation($" Backup created: {Path.GetFileName(backupPath)}");
                 return backupPath;
             }
             catch (Exception ex)
             {
-                LogManager.Instance.LogError($"Failed to create backup: {ex.Message}");
+                _logger.LogError($"Failed to create backup: {ex.Message}");
                 return null;
             }
         }

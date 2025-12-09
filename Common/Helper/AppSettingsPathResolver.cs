@@ -1,22 +1,22 @@
-﻿using Common.Logging;
+﻿using Common.Interfaces.Logging;
 
 namespace Common.Helper
 {
     public class AppSettingsPathResolver
     {
-        public static string GetAppSettingsPath(string exePath)
+        public static string GetAppSettingsPath(string exePath, ISystemLogger logger)
         {
             try
             {
                 if (string.IsNullOrWhiteSpace(exePath))
                 {
-                    LogManager.Instance.LogError("Executable path is null or empty");
+                    logger.LogError("Executable path is null or empty");
                     return null;
                 }
 
                 if (!File.Exists(exePath))
                 {
-                    LogManager.Instance.LogError($"Executable not found: {exePath}");
+                    logger.LogError($"Executable not found: {exePath}");
                     return null;
                 }
 
@@ -32,10 +32,10 @@ namespace Common.Helper
             }
             catch (Exception ex)
             {
-                LogManager.Instance.LogError($"Error resolving appsettings path: {ex.Message}");
+                logger.LogError($"Error resolving appsettings path: {ex.Message}");
                 return null;
             }
-            LogManager.Instance.LogWarning($"appsettings.json not found for: {exePath}");
+            logger.LogWarning($"appsettings.json not found for: {exePath}");
             return null;
         }
     }

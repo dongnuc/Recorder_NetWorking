@@ -1,18 +1,18 @@
-﻿using Common.Logging;
+﻿using Common.Interfaces.Logging;
 using DatabaseServices.Services;
 using Microsoft.Win32; // <<< THÊM USING NÀY
-using System;
 using System.IO;
-using System.Threading.Tasks;
 using System.Windows;
 
 namespace WpfUI
 {
     public partial class ResetDbWindow : Window
     {
-        public ResetDbWindow()
+        private readonly ISystemLogger _logger;
+        public ResetDbWindow( ISystemLogger logger)
         {
             InitializeComponent();
+            _logger = logger;
         }
 
         private void BtnBrowseSql_Click(object sender, RoutedEventArgs e)
@@ -45,13 +45,13 @@ namespace WpfUI
                 return;
             }
 
-            var service = new ResetDatabaseService(connectionString);
+            var service = new ResetDatabaseService(connectionString,_logger);
             var cts = new CancellationToken();
             var isSuccess= await service.ExecuteSqlWithConnectionString(connectionString, selectedFilePath, cts);
 
             if (isSuccess)
             {
-                LogManager.Instance.LogInfomation($"Executing SQL script: {selectedFilePath}");
+                _logger.LogInfomation($"Executing SQL script: {selectedFilePath}");
                 MessageBox.Show($"Đã reset thành công", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
                 
                 this.DialogResult = true;
@@ -59,7 +59,7 @@ namespace WpfUI
             }
             else
             {
-                LogManager.Instance.LogError("Executing Sql fail");
+                _logger.LogError("Executing Sql fail");
             }
 
         }

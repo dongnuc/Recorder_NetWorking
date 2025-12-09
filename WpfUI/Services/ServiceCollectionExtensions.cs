@@ -2,14 +2,15 @@
 using Common.Helper.Kernel32API.Implement;
 using Common.Helper.Kernel32API.Interface;
 using Common.Interfaces.IOFile;
+using Common.Interfaces.Logging;
 using Common.Interfaces.Services;
+using Common.Logging;
 using FileManagement.FileHelper;
 using FileManagement.FileHelper.FileHandler;
 using FileManagement.FolderHelper;
 using Microsoft.Extensions.DependencyInjection;
 using ProcessManagement.Services;
 using TestKitManagement.Services;
-using WpfUI.ViewModels;
 
 namespace WpfUI.Services
 {
@@ -20,6 +21,9 @@ namespace WpfUI.Services
         /// </summary>
         public static IServiceCollection AddUITestKitServices(this IServiceCollection services)
         {
+            // ✅ Logging Service (Singleton - shared across application)
+            services.AddSingleton<ISystemLogger, LogManager>();
+
             // ✅ Core Process Management Dependencies (Scoped - same as ProcessManager)
             services.AddScoped<IProcessStarter, ProcessStarter>();
             services.AddScoped<IConsolePoller, ConsolePoller>();
@@ -37,8 +41,7 @@ namespace WpfUI.Services
             services.AddScoped<ITestkitManagerService, TestkitManagerService>();
             services.AddScoped<IProcessManager, ProcessManager>();
 
-            // ViewModels
-            services.AddTransient<MainMenuViewModel>();
+            // ViewModels - not registered here since they need runtime parameters
 
             // Windows
             services.AddTransient<MainWindow>();

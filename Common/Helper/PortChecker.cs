@@ -1,5 +1,4 @@
-﻿using Common.Logging;
-using System.Net;
+﻿using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 
@@ -67,7 +66,6 @@ namespace Common.Helper
             }
             catch (Exception ex)
             {
-                LogManager.Instance.LogError($"[PortChecker] Error getting used ports: {ex.Message}");
             }
 
             return usedPorts;

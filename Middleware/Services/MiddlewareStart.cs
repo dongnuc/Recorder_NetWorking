@@ -1,11 +1,4 @@
-﻿using Common.Helper;
-using Common.Logging;
-using System.Net;
-using System.Net.Sockets;
-using System.Text;
-using static Common.Models.Entities.MiddlewareModel;
-
-namespace Middleware.Services
+﻿namespace Middleware.Services
 {
 
     //public class MiddlewareStart

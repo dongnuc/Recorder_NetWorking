@@ -1,4 +1,5 @@
 ﻿using Common.Interfaces.IOFile;
+using Common.Interfaces.Logging;
 using Microsoft.Extensions.DependencyInjection;
 using OfficeOpenXml;
 using System.Windows;
@@ -9,7 +10,7 @@ namespace WpfUI
 {
     public partial class App : Application
     {
-        private ServiceProvider _serviceProvider;
+        private ServiceProvider? _serviceProvider;
 
         protected override void OnStartup(StartupEventArgs e)
         {
@@ -26,12 +27,14 @@ namespace WpfUI
                 var fileHandler = _serviceProvider.GetRequiredService<IOFileHandler>();
                 var folderHandler = _serviceProvider.GetRequiredService<IOFolderHandler>();
                 var fileManagement = _serviceProvider.GetRequiredService<IOFileManagement>();
+                var logger = _serviceProvider.GetRequiredService<ISystemLogger>();
 
                 var explorerWindow = new ProjectExplorerWindow(
                     _serviceProvider,
                     folderHandler,
                     fileHandler,
-                    fileManagement);
+                    fileManagement,
+                    logger);
 
                 explorerWindow.Show();
             }

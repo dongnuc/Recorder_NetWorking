@@ -1,5 +1,5 @@
+using Common.Interfaces.Logging;
 using Common.Interfaces.Services;
-using Common.Logging;
 using Microsoft.Data.SqlClient;
 using System.Data;
 using System.Text.RegularExpressions;
@@ -10,10 +10,11 @@ namespace DatabaseServices.Services
     {
         private readonly string _connectionString;
         private static readonly Regex GoRegex = new("^\\s*GO\\s*$", RegexOptions.Multiline | RegexOptions.IgnoreCase);
+        private readonly ISystemLogger _logger;
 
-
-        public ResetDatabaseService(string connectionString)
+        public ResetDatabaseService(string connectionString, ISystemLogger logger)
         {
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _connectionString = connectionString ?? throw new ArgumentNullException(nameof(connectionString));
         }
 
@@ -171,7 +172,7 @@ namespace DatabaseServices.Services
 
                 if (string.IsNullOrEmpty(builder.InitialCatalog))
                 {
-                    LogManager.Instance.LogError("Connection string don't contain name database");
+                    _logger.LogError("Connection string don't contain name database");
                     return false;
                 }
 
@@ -188,7 +189,7 @@ namespace DatabaseServices.Services
                 }
                 else
                 {
-                    LogManager.Instance.LogWarning("Scrip path not contain create/drop");
+                    _logger.LogWarning("Scrip path not contain create/drop");
 
                     await DropDatabaseAsync(builder, databaseName,cts);
 

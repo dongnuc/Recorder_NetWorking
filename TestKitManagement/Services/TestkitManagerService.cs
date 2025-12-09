@@ -1,5 +1,5 @@
-﻿using Common.Interfaces.Services;
-using Common.Logging;
+﻿using Common.Interfaces.Logging;
+using Common.Interfaces.Services;
 using Common.Models.Entities;
 using Common.Resources;
 using NetworkMonitor.Models;
@@ -9,14 +9,15 @@ namespace TestKitManagement.Services
 {
     public class TestkitManagerService : ITestkitManagerService
     {
-
         #region Fields
+        
         private readonly Dictionary<int, TestStage> _testStages = new();
+        private readonly ISystemLogger _logger;
         private int _currentStageIndex = 0;
         private readonly Queue<HttpNetworkFlow> _pendingHttpNetwork = new();
         private readonly Queue<TcpNetworkFlow> _pendingTcpNetwork = new();
-
         private readonly object _lock = new object();
+        
         #endregion
 
         public event Action<string, string> OnUserInputReceived;
@@ -31,7 +32,14 @@ namespace TestKitManagement.Services
         public event Action<int, HttpNetworkFlow> OnNewHttpFlow;
         public event Action<int, TcpNetworkFlow> OnNewTcpFlow;
         public event Action<int> OnQueueCountChanged;
+
+        public TestkitManagerService(ISystemLogger logger)
+        {
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        }
+
         #region Method Helper
+        
         private TestStage CreateNewStage(int stageIndex, string input)
         {
             var newStage = new TestStage();
@@ -56,7 +64,6 @@ namespace TestKitManagement.Services
 
             return stage;
         }
-
 
         #endregion
 
@@ -111,7 +118,6 @@ namespace TestKitManagement.Services
 
                 OnStageUpdated?.Invoke(_currentStageIndex);
             }
-
         }
 
         public void IngestHttpTransaction(HttpNetworkFlow httpFlow)
@@ -164,7 +170,6 @@ namespace TestKitManagement.Services
             };
             intitalStage.User = initialInput;
             _testStages[_currentStageIndex] = intitalStage;
-            // Notify UI
 
             FlushNetworkQueue();
             OnStageCreated?.Invoke(_currentStageIndex);
@@ -226,7 +231,6 @@ namespace TestKitManagement.Services
 
             if (currentStage.Client != null)
             {
-
                 currentStage.Client.Console = output;
             }
             else
@@ -235,7 +239,8 @@ namespace TestKitManagement.Services
                 {
                     foreach (var testStage in _testStages.Values)
                     {
-                        if (testStage.User.Action == ActionKeywords.START_CLIENT && testStage.User.Stage == _currentStageIndex)
+                        if (testStage.User.Action == ActionKeywords.START_CLIENT && 
+                            testStage.User.Stage == _currentStageIndex)
                         {
                             testStage.Client = new Client
                             {
@@ -251,6 +256,7 @@ namespace TestKitManagement.Services
                         }
                     }
                 }
+                
                 currentStage.Client = new Client
                 {
                     Stage = _currentStageIndex,
@@ -261,7 +267,6 @@ namespace TestKitManagement.Services
             OnClientOutputReceived?.Invoke(output);
             OnStageUpdated?.Invoke(_currentStageIndex);
             OnStagesChanged?.Invoke(_testStages);
-
         }
 
         public void ReceiveServerOutput(string output)
@@ -274,12 +279,12 @@ namespace TestKitManagement.Services
             }
             else
             {
-
                 if (!isCaptureServer)
                 {
                     foreach (var testStage in _testStages.Values)
                     {
-                        if (testStage.User!.Action.Equals(ActionKeywords.START_SERVER) && testStage.User.Stage == _currentStageIndex)
+                        if (testStage.User!.Action.Equals(ActionKeywords.START_SERVER) && 
+                            testStage.User.Stage == _currentStageIndex)
                         {
                             testStage.Server = new Server
                             {
@@ -294,23 +299,20 @@ namespace TestKitManagement.Services
 
                             return;
                         }
-
                     }
                 }
                
-                    currentStage.Server = new Server
-                    {
-                        Stage = _currentStageIndex,
-                        Console = output ?? string.Empty
-                    };
-
+                currentStage.Server = new Server
+                {
+                    Stage = _currentStageIndex,
+                    Console = output ?? string.Empty
+                };
             }
-            // Notify UI
+            
             OnServerOutputReceived?.Invoke(output);
             OnStageUpdated?.Invoke(_currentStageIndex);
             OnStagesChanged?.Invoke(_testStages);
         }
-
 
         public void ReceiveUserInput(string input, string dataType)
         {
@@ -321,7 +323,6 @@ namespace TestKitManagement.Services
             OnStageCreated?.Invoke(_currentStageIndex);
             OnStagesChanged?.Invoke(_testStages);
         }
-
 
         public void DeleteStage(int stageKey)
         {
@@ -340,7 +341,7 @@ namespace TestKitManagement.Services
                         _currentStageIndex = 0;
                     }
 
-                    LogManager.Instance.LogInfomation($"Stage {stageKey} deleted. Current index updated to: {_currentStageIndex}");
+                    _logger.LogInfomation($"Stage {stageKey} deleted. Current index updated to: {_currentStageIndex}");
                 }
             }
 
@@ -354,6 +355,5 @@ namespace TestKitManagement.Services
             }
             _testStages?.Clear();
         }
-
     }
 }

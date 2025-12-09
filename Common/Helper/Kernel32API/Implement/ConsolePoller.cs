@@ -1,8 +1,10 @@
-﻿using Common.Logging;
+﻿using Common.Helper.Kernel32API.Interface;
+using Common.Interfaces.Logging;
+using Common.Resources;
 using System.Runtime.InteropServices;
 using System.Text;
 
-namespace Common.Helper.Kernel32API
+namespace Common.Helper.Kernel32API.Implement
 {
     public class ConsolePoller : IConsolePoller
     {
@@ -31,6 +33,12 @@ namespace Common.Helper.Kernel32API
         static extern bool ReleaseMutex(IntPtr hMutex);
 
         private readonly Dictionary<uint, bool> _firstPolls = new Dictionary<uint, bool>();
+        private readonly ISystemLogger _logger;
+
+        public ConsolePoller(ISystemLogger logger)
+        {
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        }
 
         public async Task<string> CaptureCurrentConsoleAsync(
            ChildProcess child,
@@ -61,7 +69,7 @@ namespace Common.Helper.Kernel32API
 
                 if (!attached)
                 {
-                    LogManager.Instance.LogWarning($"⚠️ Could not attach to console for process {child.processId}");
+                    _logger.LogWarning($"⚠️ Could not attach to console for process {child.processId}");
                     return string.Empty;
                 }
 
@@ -100,7 +108,7 @@ namespace Common.Helper.Kernel32API
                 if (!ReadConsoleOutputCharacter(hOut, sb, length, coord, out read))
                 {
                     FreeConsole();
-                    LogManager.Instance.LogWarning($"⚠️ Failed to read console buffer for process {child.processId}");
+                    _logger.LogWarning($"⚠️ Failed to read console buffer for process {child.processId}");
                     return string.Empty;
                 }
 
@@ -116,10 +124,6 @@ namespace Common.Helper.Kernel32API
                     int lineLength = Math.Min(info.dwSize.X, currentBuffer.Length - start);
                     string line = currentBuffer.Substring(start, lineLength).TrimEnd();
 
-                    //if (!string.IsNullOrEmpty(line))
-                    //{
-                    //    lines.Add(line);
-                    //}
                     lines.Add(line);
                 }
 
@@ -131,7 +135,7 @@ namespace Common.Helper.Kernel32API
             }
             catch (Exception ex)
             {
-                LogManager.Instance.LogError($"❌ Error capturing console for process {child.processId}: {ex.Message}");
+                _logger.LogError($"❌ Error capturing console for process {child.processId}: {ex.Message}");
                 try { FreeConsole(); } catch { }
                 return string.Empty;
             }
@@ -170,7 +174,7 @@ namespace Common.Helper.Kernel32API
                 }
                 catch (Exception ex)
                 {
-                    LogManager.Instance.LogError($"❌ Attempt {attempt} failed: {ex.Message}");
+                    _logger.LogError($"❌ Attempt {attempt} failed: {ex.Message}");
 
                     if (attempt >= maxRetries)
                     {
@@ -181,7 +185,7 @@ namespace Common.Helper.Kernel32API
                 }
             }
 
-            LogManager.Instance.LogWarning($"⚠️ All {maxRetries} attempts failed for process {child.processId}");
+            _logger.LogWarning($"⚠️ All {maxRetries} attempts failed for process {child.processId}");
             return string.Empty;
         }
     }

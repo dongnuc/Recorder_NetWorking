@@ -1,4 +1,6 @@
 ﻿using Common.Helper;
+using Common.Interfaces.Logging;
+using Moq;
 
 namespace Common.Test
 {
@@ -8,10 +10,16 @@ namespace Common.Test
         private string _basePath;
         private string _exePath;
         private string _appSettingsPath;
+        private Mock<ISystemLogger> _mockLogger;
+        private ISystemLogger _logger;
 
         [SetUp]
         public void Setup()
         {
+            // Setup mock logger
+            _mockLogger = new Mock<ISystemLogger>();
+            _logger = _mockLogger.Object;
+
             string testDir = TestContext.CurrentContext.TestDirectory;
             _basePath = Path.Combine(testDir, "resource", "ServerPublish");
             if (!Directory.Exists(_basePath))
@@ -35,27 +43,31 @@ namespace Common.Test
                 File.Delete(_appSettingsPath);
             }
         }
+
         [TestCase("")]
-        public void TC01_ReadPortFromExePath_InputNullOrEmpty_ReturnsNull(string inputPath)
+        public void TC01_ReadPortFromExePath_InputNullOrEmpty_ThrowsException(string inputPath)
         {
-            // Act
+            // Act & Assert
             var ex = Assert.Throws<FileNotFoundException>(() =>
             {
-                AppSettingsManager.ReadPortFromExePath(inputPath);
+                AppSettingsManager.ReadPortFromExePath(inputPath, _logger);
             });
 
-            // Assert
             Assert.That(ex.Message, Does.Contain("Exe not found"));
         }
+
         [Test]
-        public void TC02_ReadPortFromExePath_ExeFileNotFound_ReturnsNull()
+        public void TC02_ReadPortFromExePath_ExeFileNotFound_ThrowsException()
         {
+            // Arrange
             string wrongPath = Path.Combine(_basePath, "non_existent.exe");
 
+            // Act & Assert
             var ex = Assert.Throws<FileNotFoundException>(() =>
             {
-                AppSettingsManager.ReadPortFromExePath(wrongPath);
+                AppSettingsManager.ReadPortFromExePath(wrongPath, _logger);
             });
+            
             Assert.That(ex.Message, Does.Contain("Exe not found"));
             Assert.That(ex.FileName, Is.EqualTo(wrongPath));
         }
@@ -63,11 +75,18 @@ namespace Common.Test
         [Test]
         public void TC03_ReadPortFromExePath_AppSettingsNotFound_ReturnsNull()
         {
-            if (File.Exists(_appSettingsPath)) File.Delete(_appSettingsPath);
+            // Arrange
+            if (File.Exists(_appSettingsPath)) 
+                File.Delete(_appSettingsPath);
 
-            var result = AppSettingsManager.ReadPortFromExePath(_exePath);
+            // Act
+            var result = AppSettingsManager.ReadPortFromExePath(_exePath, _logger);
 
+            // Assert
             Assert.IsNull(result);
+            _mockLogger.Verify(
+                x => x.LogWarning(It.Is<string>(s => s.Contains("appsettings. json not found"))), 
+                Times.Once);
         }
 
         [Test]
@@ -81,11 +100,14 @@ namespace Common.Test
             File.WriteAllText(_appSettingsPath, jsonContent);
 
             // Act
-            var result = AppSettingsManager.ReadPortFromExePath(_exePath);
+            var result = AppSettingsManager.ReadPortFromExePath(_exePath, _logger);
 
             // Assert
             Assert.IsNotNull(result);
             Assert.That(result, Is.EqualTo(5000));
+            _mockLogger.Verify(
+                x => x.LogInfomation(It.Is<string>(s => s.Contains("Port value read") && s.Contains("5000"))), 
+                Times.Once);
         }
 
         [Test]
@@ -99,10 +121,13 @@ namespace Common.Test
             File.WriteAllText(_appSettingsPath, jsonContent);
 
             // Act
-            var result = AppSettingsManager.ReadPortFromExePath(_exePath);
+            var result = AppSettingsManager.ReadPortFromExePath(_exePath, _logger);
 
             // Assert
             Assert.IsNull(result);
+            _mockLogger.Verify(
+                x => x.LogWarning(It.Is<string>(s => s.Contains("Port property not found"))), 
+                Times.Once);
         }
 
         [Test]
@@ -113,26 +138,87 @@ namespace Common.Test
             File.WriteAllText(_appSettingsPath, invalidJson);
 
             // Act
-            var result = AppSettingsManager.ReadPortFromExePath(_exePath);
+            var result = AppSettingsManager.ReadPortFromExePath(_exePath, _logger);
 
             // Assert
             Assert.IsNull(result);
+            _mockLogger.Verify(
+                x => x.LogError(It.Is<string>(s => s.Contains("Failed to parse JSON"))), 
+                Times.Once);
         }
 
         [Test]
-        public void TC07_ReadPortFromExePath_PortValueIsNotInteger_ReturnsNull()
+        public void TC07_ReadPortFromExePath_PortValueIsInteger_ReturnsValue()
         {
             // Arrange
             string jsonContent = @"{ ""Port"": 5000 }";
             File.WriteAllText(_appSettingsPath, jsonContent);
 
             // Act
-            var result = AppSettingsManager.ReadPortFromExePath(_exePath);
+            var result = AppSettingsManager.ReadPortFromExePath(_exePath, _logger);
 
             // Assert
             Assert.IsNotNull(result);
-            Assert.That(result,Is.EqualTo(result));
+            Assert.That(result, Is.EqualTo(5000));
+            _mockLogger.Verify(
+                x => x.LogInfomation(It.Is<string>(s => s.Contains("Port value read") && s.Contains("5000"))), 
+                Times.Once);
         }
 
+        [Test]
+        public void TC08_ReadPortFromExePath_PortValueIsString_ReturnsNull()
+        {
+            // Arrange
+            string jsonContent = @"{ ""Port"": ""not_a_number"" }";
+            File.WriteAllText(_appSettingsPath, jsonContent);
+
+            // Act
+            var result = AppSettingsManager.ReadPortFromExePath(_exePath, _logger);
+
+            // Assert
+            Assert.IsNull(result);
+            _mockLogger.Verify(
+                x => x.LogError(It.Is<string>(s => s.Contains("Failed to read port from appsettings"))), 
+                Times.Once);
+        }
+
+        [Test]
+        public void TC09_ReadPortFromExePath_MultiplePortsInJson_ReturnsFirstPort()
+        {
+            // Arrange
+            string jsonContent = @"{
+                ""Port"": 3000,
+                ""ServerPort"": 4000,
+                ""ClientPort"": 5000
+            }";
+            File.WriteAllText(_appSettingsPath, jsonContent);
+
+            // Act
+            var result = AppSettingsManager.ReadPortFromExePath(_exePath, _logger);
+
+            // Assert
+            Assert.IsNotNull(result);
+            Assert.That(result, Is.EqualTo(3000));
+            _mockLogger.Verify(
+                x => x.LogInfomation(It.Is<string>(s => s.Contains("Port value read") && s.Contains("3000"))), 
+                Times.Once);
+        }
+
+        [Test]
+        public void TC10_ReadPortFromExePath_EmptyJsonFile_ReturnsNull()
+        {
+            // Arrange
+            string jsonContent = @"{}";
+            File.WriteAllText(_appSettingsPath, jsonContent);
+
+            // Act
+            var result = AppSettingsManager.ReadPortFromExePath(_exePath, _logger);
+
+            // Assert
+            Assert.IsNull(result);
+            _mockLogger.Verify(
+                x => x.LogWarning(It.Is<string>(s => s.Contains("Port property not found"))), 
+                Times.Once);
+        }
     }
 }

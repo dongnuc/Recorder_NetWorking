@@ -1,16 +1,16 @@
 ﻿using Common.Interfaces.IOFile;
+using Common.Interfaces.Logging;
 using Common.Interfaces.Services;
-using Common.Logging;
 using Microsoft.Extensions.DependencyInjection;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using WpfUI.Controls;
 using WpfUI.Dialogs;
 using WpfUI.Properties;
 using WpfUI.Services;
 using WpfUI.ViewModels;
-
 
 namespace WpfUI
 {
@@ -22,20 +22,20 @@ namespace WpfUI
         public RecorderWindow RecorderWindow { get; set; }
     }
 
-
     public partial class MainMenu : Window
     {
         private MainMenuViewModel _viewModel;
         private readonly IOFileManagement _fileManager;
-
         private Dictionary<Guid, TabItemData> _activeTabs = new Dictionary<Guid, TabItemData>();
         private IOFileHandler _fileHandler;
         private readonly IServiceProvider _serviceProvider;
+        private readonly ISystemLogger _logger;
 
         public MainMenu(MainMenuViewModel viewModel,
             IOFileHandler fileHandler,
             IServiceProvider serviceProvider,
-            IOFileManagement fileManager)
+            IOFileManagement fileManager,
+            ISystemLogger logger)
         {
             InitializeComponent();
             _viewModel = viewModel;
@@ -43,6 +43,11 @@ namespace WpfUI
             _fileHandler = fileHandler;
             _serviceProvider = serviceProvider;
             _fileManager = fileManager;
+
+
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            var logViewer = new LogViewerControl(_logger);
+            LogViewer.Content = logViewer;
         }
 
         private void FileTree_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
@@ -73,7 +78,7 @@ namespace WpfUI
 
         private void BtnConfig_Click(object sender, RoutedEventArgs e)
         {
-            var dialog = new ConfigWindow();
+            var dialog = new ConfigWindow(_logger);
             dialog.Owner = this;
             dialog.ShowDialog();
         }
@@ -82,7 +87,6 @@ namespace WpfUI
         {
             var treeViewItem = sender as TreeViewItem;
             if (treeViewItem == null) return;
-
 
             var selectedItem = _viewModel.SelectedItem;
             if (selectedItem == null) return;
@@ -175,7 +179,7 @@ namespace WpfUI
 
         private void BtnResetDb_Click(object sender, RoutedEventArgs e)
         {
-            var dialog = new ResetDbWindow();
+            var dialog = new ResetDbWindow(_logger);
             dialog.Owner = this;
             dialog.ShowDialog();
         }
@@ -214,6 +218,7 @@ namespace WpfUI
         }
 
         #region recorder tab 
+        
         private async Task CreateRecorderTab(string testcasePath, string testcaseName, string clientPath, string serverPath, bool isHttp)
         {
             RecorderWindowScope scope = null;
@@ -224,13 +229,16 @@ namespace WpfUI
                 scope = new RecorderWindowScope(_serviceProvider);
                 var processManager = scope.ServiceProvider.GetRequiredService<IProcessManager>();
                 var testkitManagerSerive = scope.ServiceProvider.GetRequiredService<ITestkitManagerService>();
+                var logger = scope.ServiceProvider.GetRequiredService<ISystemLogger>();
+                
                 var recorderWindow = new RecorderWindow(testcasePath, testcaseName, clientPath,
                     serverPath, isHttp,
-                    processManager, _fileHandler, testkitManagerSerive);
+                    processManager, _fileHandler, testkitManagerSerive, logger);
+                    
                 bool initSuccess = await recorderWindow.InitializeAsync();
                 if (!initSuccess)
                 {
-                    LogManager.Instance.LogWarning("Device is null");
+                    _logger.LogWarning("Device is null");
                 }
 
                 var windowContent = recorderWindow.Content as FrameworkElement;
@@ -268,7 +276,7 @@ namespace WpfUI
             }
             catch (Exception ex)
             {
-                LogManager.Instance?.LogError($" Error creating tab: {ex.Message}");
+                _logger?.LogError($" Error creating tab: {ex.Message}");
             }
         }
 
@@ -313,7 +321,7 @@ namespace WpfUI
                         }
                         catch (Exception ex)
                         {
-                            LogManager.Instance?.LogWarning($"Error cleaning up RecorderWindow: {ex.Message}");
+                            _logger?.LogWarning($"Error cleaning up RecorderWindow: {ex.Message}");
                         }
                     }
                     tabData.TabItem.Content = null;
@@ -321,7 +329,6 @@ namespace WpfUI
                     if (TestCaseTabControl.SelectedItem == tabData.TabItem)
                     {
                         TestCaseTabControl.SelectedItem = _activeTabs.Count > 1 ? null : WelcomeTab;
-
                         TestCaseTabControl.UpdateLayout();
                     }
 
@@ -337,16 +344,15 @@ namespace WpfUI
                         WelcomeTab.Visibility = Visibility.Visible;
                         TestCaseTabControl.SelectedItem = WelcomeTab;
                     }
-                   
                 }
                 else
                 {
-                    LogManager.Instance?.LogWarning($"Attempted to close non-existent tab with ID: {id}");
+                    _logger?.LogWarning($"Attempted to close non-existent tab with ID: {id}");
                 }
             }
             catch (Exception ex)
             {
-                LogManager.Instance?.LogError($" Error closing tab (ID: {id}): {ex.Message}");
+                _logger?.LogError($" Error closing tab (ID: {id}): {ex.Message}");
                 MessageBox.Show($"Error closing tab:\n{ex.Message}", "Error",
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
@@ -372,7 +378,7 @@ namespace WpfUI
             {
                 if (_activeTabs.TryGetValue(tabId, out var tabData))
                 {
-                    // (Logic khi chọn tab)
+                    // Logic khi chọn tab
                 }
             }
         }

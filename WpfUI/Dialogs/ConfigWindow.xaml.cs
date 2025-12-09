@@ -1,6 +1,5 @@
-﻿using Common.Logging;
+﻿using Common.Interfaces.Logging;
 using Microsoft.Win32;
-using System;
 using System.Windows;
 using WpfUI.Properties;
 
@@ -8,10 +7,12 @@ namespace WpfUI.Dialogs
 {
     public partial class ConfigWindow : Window
     {
-        public ConfigWindow()
+        private readonly ISystemLogger _logger;
+        public ConfigWindow( ISystemLogger logger)
         {
             InitializeComponent();
             LoadSettings();
+            _logger = logger;
         }
 
         private void LoadSettings()
@@ -51,14 +52,14 @@ namespace WpfUI.Dialogs
 
                 Settings.Default.Save();
 
-                LogManager.Instance.LogInfomation($"⚙️ Settings saved. Protocol={Settings.Default.Protocol}");
+                _logger.LogInfomation($"⚙️ Settings saved. Protocol={Settings.Default.Protocol}");
 
                 this.DialogResult = true;
                 this.Close();
             }
             catch (Exception ex)
             {
-                LogManager.Instance.LogError($"Failed to save settings: {ex.Message}");
+                _logger.LogError($"Failed to save settings: {ex.Message}");
                 MessageBox.Show($"Failed to save settings: {ex.Message}", "Error");
             }
         }

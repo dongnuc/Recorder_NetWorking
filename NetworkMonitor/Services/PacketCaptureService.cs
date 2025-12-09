@@ -1,8 +1,6 @@
-﻿﻿using Common.Interfaces.Services;
-using Common.Logging;
+﻿using Common.Interfaces.Services;
 using NetworkMonitor.Abstractions;
 using NetworkMonitor.Keywords;
-using NetworkMonitor.Models;
 using PacketDotNet;
 using SharpPcap;
 using System.Text;
@@ -56,7 +54,6 @@ namespace NetworkMonitor.Services
                 }
                 catch (Exception ex)
                 {
-                    LogManager.Instance.LogError(string.Format(Service_Keywords.StopCloseError, ex.GetType().Name, ex.Message));
                 }
             }
         }
@@ -93,7 +90,6 @@ namespace NetworkMonitor.Services
             }
             catch (Exception ex)
             {
-                LogManager.Instance.LogError(string.Format(Service_Keywords.OpenDeviceError, ex.GetType().Name, ex.Message));
                 return;
             }
 
@@ -106,7 +102,6 @@ namespace NetworkMonitor.Services
             }
             catch (Exception ex)
             {
-                LogManager.Instance.LogError(string.Format(Service_Keywords.FilterError, ex.GetType().Name, ex.Message));
                 try { device.Filter = ""; } catch { }
             }
 
@@ -118,7 +113,6 @@ namespace NetworkMonitor.Services
             }
             catch (Exception ex)
             {
-                LogManager.Instance.LogError(string.Format(Service_Keywords.StartCaptureError, ex.GetType().Name, ex.Message));
                 startupSignal.TrySetException(ex);
                 return;
             }
@@ -241,7 +235,6 @@ namespace NetworkMonitor.Services
             }
             catch (Exception ex)
             {
-                LogManager.Instance.LogError(string.Format(Service_Keywords.HandlerError, DateTime.Now.ToString(Logging_Keywords.TimestampFormat), ex.GetType().Name, ex.Message));
             }
         }
 

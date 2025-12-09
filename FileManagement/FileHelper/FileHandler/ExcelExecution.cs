@@ -1,5 +1,4 @@
 ﻿using Common.Interfaces.IOFile;
-using Common.Logging;
 using Common.Models.Entities;
 using OfficeOpenXml;
 using OfficeOpenXml.Style;
@@ -366,7 +365,7 @@ namespace FileManagement.FileHelper.FileHandler
 
                 package.SaveAs(new FileInfo(filePath));
 
-                LogManager.Instance.LogInfomation($"Xuất file Excel thành công!\nĐường dẫn: {filePath}");
+                //LogManager.Instance.LogInfomation($"Xuất file Excel thành công!\nĐường dẫn: {filePath}");
             }
             catch (Exception ex)
             {
@@ -375,11 +374,11 @@ namespace FileManagement.FileHelper.FileHandler
                 {
                     string logPath = Path.Combine(Path.GetDirectoryName(filePath) ?? AppDomain.CurrentDomain.BaseDirectory, "ExportLog.txt");
                     File.AppendAllText(logPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Lỗi khi export Excel:\n{ex}\n\n");
-                    LogManager.Instance.LogError($"Xuất Excel thất bại!\\nChi tiết lỗi đã được ghi tại:\\n{logPath}");
+                    //LogManager.Instance.LogError($"Xuất Excel thất bại!\\nChi tiết lỗi đã được ghi tại:\\n{logPath}");
                 }
                 catch
                 {
-                    LogManager.Instance.LogError($"Xuất Excel thất bại!\\nChi tiết lỗi đã được ghi tại:\\n{ex.Message}");
+                    //LogManager.Instance.LogError($"Xuất Excel thất bại!\\nChi tiết lỗi đã được ghi tại:\\n{ex.Message}");
                 }
             }
         }
