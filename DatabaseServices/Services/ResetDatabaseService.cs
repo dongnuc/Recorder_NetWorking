@@ -207,7 +207,6 @@ namespace DatabaseServices.Services
             return false;
         }
 
-
         public async Task ResetDatabaseAsync(string sqlScriptPath)
         {
             if (string.IsNullOrWhiteSpace(sqlScriptPath))

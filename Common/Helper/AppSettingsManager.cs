@@ -150,16 +150,10 @@ namespace Common.Helper
 
         public static int? ReadPortFromExePath(string exePath)
         {
+            if (!File.Exists(exePath)) throw new FileNotFoundException("Exe not found", exePath);
+
             try
             {
-                // Validate exe path
-                if (string.IsNullOrEmpty(exePath) || !File.Exists(exePath))
-                {
-                    LogManager.Instance.LogError($"Exe file not found: {exePath}");
-                    return null;
-                }
-
-                // Get directory containing the exe file
                 string exeDirectory = Path.GetDirectoryName(exePath);
 
                 // Construct appsettings. json path

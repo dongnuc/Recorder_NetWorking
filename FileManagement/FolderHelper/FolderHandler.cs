@@ -72,12 +72,10 @@ namespace FileManagement.FolderHelper
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Lỗi khi tạo thư mục/file: {ex.Message}");
+                throw new Exception($"Lỗi khi tạo thư mục/file tại đường dẫn '{mainFolderPath}'");
                 return string.Empty;
             }
         }
-
-
 
         public void CopyTemplateFromResource(string path, string srcDirectory, bool overwrite = true, params string[] specialFiles)
         {

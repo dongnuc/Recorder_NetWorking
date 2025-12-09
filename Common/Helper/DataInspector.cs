@@ -107,7 +107,6 @@ namespace Common.Helper
             // Handle empty cases
             if (string.IsNullOrEmpty(after))
             {
-                LogManager.Instance.LogDebug("   ⚠️ AFTER is empty - No new content");
                 return string.Empty;
             }
 
@@ -133,16 +132,10 @@ namespace Common.Helper
             }
             else if (!string.Equals(afterTrimmed, beforeTrimmed, StringComparison.Ordinal))
             {
-                // AFTER is completely different
-                LogManager.Instance.LogDebug($"   ⚠️ AFTER is different (not a continuation) - Return full AFTER");
-                LogManager.Instance.LogInfomation(afterTrimmed);
-
                 return afterTrimmed;
             }
             else
             {
-                // No change
-                LogManager.Instance.LogDebug("   ℹ️ No changes detected");
                 return string.Empty;
             }
         }

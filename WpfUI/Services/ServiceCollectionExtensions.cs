@@ -1,4 +1,7 @@
-﻿using Common.Interfaces.IOFile;
+﻿using Common.Helper.Kernel32API;
+using Common.Helper.Kernel32API.Implement;
+using Common.Helper.Kernel32API.Interface;
+using Common.Interfaces.IOFile;
 using Common.Interfaces.Services;
 using FileManagement.FileHelper;
 using FileManagement.FileHelper.FileHandler;
@@ -6,7 +9,6 @@ using FileManagement.FolderHelper;
 using Microsoft.Extensions.DependencyInjection;
 using ProcessManagement.Services;
 using TestKitManagement.Services;
-using WpfUI.Controls;
 using WpfUI.ViewModels;
 
 namespace WpfUI.Services
@@ -14,28 +16,32 @@ namespace WpfUI.Services
     public static class ServiceCollectionExtensions
     {
         /// <summary>
-        /// ✅ Register tất cả services cho UITestKit
+        /// ✅ Register tất cả services cho UITestKit với full Dependency Injection
         /// </summary>
         public static IServiceCollection AddUITestKitServices(this IServiceCollection services)
         {
-            // Logging
-            //services.AddSingleton<ISystemLogger>(sp => LogManager.Instance);
+            // ✅ Core Process Management Dependencies (Scoped - same as ProcessManager)
+            services.AddScoped<IProcessStarter, ProcessStarter>();
+            services.AddScoped<IConsolePoller, ConsolePoller>();
+            services.AddScoped<IKeyListener, KeyListener>();
+            services.AddScoped<IMutexManager, MutexManager>();
+            services.AddScoped<IConsoleManager, ConsoleManager>();
+            services.AddScoped<IProcessWaiter, ProcessWaiter>();
 
-            // Core Services
+            // ✅ Core Services
             services.AddSingleton<IOFileHandler, ExcelExecution>();
             services.AddSingleton<IOFileManagement, FileManage>();
             services.AddSingleton<IOFolderHandler, FolderHandler>();
 
-            services.AddScoped<IProcessManager, ProcessManager>();
+            // ✅ Main Services (với đầy đủ DI)
             services.AddScoped<ITestkitManagerService, TestkitManagerService>();
+            services.AddScoped<IProcessManager, ProcessManager>();
+
             // ViewModels
             services.AddTransient<MainMenuViewModel>();
 
             // Windows
             services.AddTransient<MainWindow>();
-
-            // Controls
-            //services.AddTransient<LogViewerControl>();
 
             return services;
         }

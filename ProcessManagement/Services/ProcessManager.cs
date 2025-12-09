@@ -27,25 +27,33 @@ namespace ProcessManagement.Services
 
         private readonly ConcurrentDictionary<string, string> _previousSnapshots = new();
 
-        // ✅ LOCK ĐỂ ĐẢM BẢO THỨ TỰ CAPTURE
         private readonly SemaphoreSlim _captureLock = new SemaphoreSlim(1, 1);
 
-        // ✅ TRACK GLOBAL F12 STATE ĐỂ TRÁNH DUPLICATE
         private volatile bool _isCapturing = false;
 
         #endregion
 
         #region Constructor
 
-        public ProcessManager(ITestkitManagerService testkitManagerService)
+        /// <summary>
+        /// ✅ REFACTORED: Constructor with full Dependency Injection
+        /// </summary>
+        public ProcessManager(
+            ITestkitManagerService testkitManagerService,
+            IProcessStarter processStarter,
+            IConsolePoller consolePoller,
+            IKeyListener keyListener,
+            IMutexManager mutexManager,
+            IConsoleManager consoleManager,
+            IProcessWaiter processWaiter)
         {
-            _processStarter = new ProcessStarter();
-            _consolePoller = new ConsolePoller();
-            _keyListener = new KeyListener();
-            _mutexManager = new MutexManager();
-            _consoleManager = new ConsoleManager();
-            _processWaiter = new ProcessWaiter();
-            _testkitManagerService = testkitManagerService;
+            _testkitManagerService = testkitManagerService ?? throw new ArgumentNullException(nameof(testkitManagerService));
+            _processStarter = processStarter ?? throw new ArgumentNullException(nameof(processStarter));
+            _consolePoller = consolePoller ?? throw new ArgumentNullException(nameof(consolePoller));
+            _keyListener = keyListener ?? throw new ArgumentNullException(nameof(keyListener));
+            _mutexManager = mutexManager ?? throw new ArgumentNullException(nameof(mutexManager));
+            _consoleManager = consoleManager ?? throw new ArgumentNullException(nameof(consoleManager));
+            _processWaiter = processWaiter ?? throw new ArgumentNullException(nameof(processWaiter));
         }
 
         #endregion
@@ -210,8 +218,6 @@ namespace ProcessManagement.Services
             await _captureLock.WaitAsync();
             try
             {
-                LogManager.Instance.LogInfomation($"📸 F12 PRESSED (triggered by {triggerProcess})");
-
                 bool hasClient = _processHandles.ContainsKey("Client");
                 bool hasServer = _processHandles.ContainsKey("Server");
 
@@ -240,10 +246,6 @@ namespace ProcessManagement.Services
                 {
                     var serverHandles = _processHandles["Server"];
                     await ExecuteCaptureSequenceAsync(serverHandles.child, serverHandles.mutex, "Server");
-                }
-                else
-                {
-                    LogManager.Instance.LogWarning($"⚠️ No processes running to capture");
                 }
             }
             finally

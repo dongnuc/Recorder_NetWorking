@@ -109,18 +109,6 @@ namespace NetworkMonitor.Services
             return flow;
         }
 
-        /// <summary>
-        /// Converts a network flow object to JSON string.
-        /// </summary>
-        public static string ToJson<T>(T flow) where T : class
-        {
-            var options = new JsonSerializerOptions
-            {
-                WriteIndented = true,
-                DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.Never
-            };
-            return JsonSerializer.Serialize(flow, options);
-        }
 
         /// <summary>
         /// Gets TCP flags as a comma-separated string.
