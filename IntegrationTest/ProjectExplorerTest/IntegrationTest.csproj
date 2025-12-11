@@ -24,6 +24,8 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\..\Common\Common.csproj" />
+		<ProjectReference Include="..\..\DatabaseServices\DatabaseServices.csproj" />
+		<ProjectReference Include="..\..\FileManagement\FileManagement.csproj" />
 		<ProjectReference Include="..\..\WpfUI\WpfUI.csproj" />
 	</ItemGroup>
 
