@@ -214,7 +214,7 @@ namespace ProcessManagement.Services
         /// <summary>
         /// ✅ XỬ LÝ F12 PRESS VỚI ƯU TIÊN CLIENT TRƯỚC
         /// </summary>
-        private async Task HandleF12PressAsync(string triggerProcess)
+        internal async Task HandleF12PressAsync(string triggerProcess)
         {
             await _captureLock.WaitAsync();
             try
@@ -258,7 +258,7 @@ namespace ProcessManagement.Services
         /// <summary>
         /// Execute capture sequence với adaptive polling và longer timeout
         /// </summary>
-        private async Task ExecuteCaptureSequenceAsync(
+        internal async Task ExecuteCaptureSequenceAsync(
             ChildProcess child,
             IntPtr mutex,
             string processName)
