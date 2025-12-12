@@ -11,7 +11,7 @@ namespace IntegrationTest.ProjectManagementTest
     public class RemoveRecentProjectTest : ProjectExplorerTestBase
     {
         [Test]
-        public void RemoveRecent_ClickButton_ShouldRemoveFromSettingsAndList()
+        public void RemoveRecent_ClickButton()
         {
             string projName = "ProjectToRemove";
             CreateDummyProject(projName);
@@ -28,8 +28,6 @@ namespace IntegrationTest.ProjectManagementTest
 
                 var fakeButton = new WpfButton { Tag = fullPath };
 
-                // --- SỬA Ở ĐÂY ---
-                // Thay vì new RoutedEventArgs(), hãy chỉ định rõ đây là sự kiện Click
                 var args = new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent);
 
                 InvokePrivateMethod(window, "BtnRemoveRecent_Click", fakeButton, args);

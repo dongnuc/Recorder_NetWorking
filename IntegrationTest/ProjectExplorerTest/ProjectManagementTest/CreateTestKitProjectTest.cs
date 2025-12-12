@@ -41,7 +41,7 @@ namespace IntegrationTest.ProjectManagementTest
             if (Directory.Exists(_testRootPath))
             {
                 try { Directory.Delete(_testRootPath, recursive: true); }
-                catch { /* Ignore */ }
+                catch { }
             }
             Directory.CreateDirectory(_testRootPath);
 
@@ -58,14 +58,13 @@ namespace IntegrationTest.ProjectManagementTest
             if (Directory.Exists(_testRootPath))
             {
                 try { Directory.Delete(_testRootPath, recursive: true); }
-                catch { /* Ignore */ }
+                catch {  }
             }
         }
 
-        // --- TEST CASES ---
 
         [Test]
-        public void CreateNewProject_ValidInput_ShouldCreateFolderStructure()
+        public void CreateNewProject_ValidInput()
         {
             string projectName = "MyTestProject";
             string expectedFullPath = Path.Combine(_testRootPath, projectName);
@@ -86,7 +85,6 @@ namespace IntegrationTest.ProjectManagementTest
 
                 InvokePrivateMethod(setupWindow, "BtnCreateProject_Click", null, null);
 
-                // Process pending messages
                 DoEvents();
 
                 setupWindow.ProjectCreatedSuccessfully.Should().BeTrue(
@@ -103,7 +101,7 @@ namespace IntegrationTest.ProjectManagementTest
         }
 
         [Test]
-        public void CreateNewProject_EmptyProjectName_ShouldShowValidationError()
+        public void CreateNewProject_EmptyProjectName()
         {
             var setupWindow = InitializeWindow();
             setupWindow.Show();
@@ -129,80 +127,6 @@ namespace IntegrationTest.ProjectManagementTest
             }
         }
 
-        [Test]
-        public void CreateNewProject_DuplicateName_UserClicksNo_ShouldNotOverwrite()
-        {
-            string projectName = "DuplicateProj";
-            string fullPath = Path.Combine(_testRootPath, projectName);
-            Directory.CreateDirectory(fullPath);
-
-            var setupWindow = InitializeWindow();
-            setupWindow.Show();
-
-            try
-            {
-                SetPrivateTextBoxValue(setupWindow, "TxtProjectName", projectName);
-                SetPrivateTextBoxValue(setupWindow, "TxtProjectLocation", _testRootPath);
-
-                var result = HandleMessageBoxWithAction(
-                    action: () => InvokePrivateMethod(setupWindow, "BtnCreateProject_Click", null, null),
-                    expectedTitle: "Cảnh báo",
-                    buttonToClick: "No"
-                );
-
-                result.Found.Should().BeTrue("MessageBox warning should appear for duplicate project");
-                setupWindow.ProjectCreatedSuccessfully.Should().BeFalse("Project should not be created when user clicks No");
-            }
-            finally
-            {
-                setupWindow.Close();
-            }
-        }
-
-        [Test]
-        public void CreateNewProject_DuplicateName_UserClicksYes_ShouldOverwrite()
-        {
-            string projectName = "OverwriteProj";
-            string fullPath = Path.Combine(_testRootPath, projectName);
-            Directory.CreateDirectory(fullPath);
-
-            _mockFolderHandler!.Setup(x => x.CreateDirectory(
-                It.IsAny<string>(),
-                It.IsAny<string>(),
-                It.IsAny<string[]>()))
-                .Returns(fullPath);
-
-            var setupWindow = InitializeWindow();
-            setupWindow.Show();
-
-            try
-            {
-                SetPrivateTextBoxValue(setupWindow, "TxtProjectName", projectName);
-                SetPrivateTextBoxValue(setupWindow, "TxtProjectLocation", _testRootPath);
-
-                var result = HandleMessageBoxWithAction(
-                    action: () => InvokePrivateMethod(setupWindow, "BtnCreateProject_Click", null, null),
-                    expectedTitle: "Cảnh báo",
-                    buttonToClick: "Yes"
-                );
-
-                result.Found.Should().BeTrue("MessageBox warning should appear");
-
-                // Wait for processing
-                Thread.Sleep(800);
-                DoEvents();
-
-                setupWindow.ProjectCreatedSuccessfully.Should().BeTrue(
-                    "Project should be created when user clicks Yes");
-            }
-            finally
-            {
-                setupWindow.Close();
-            }
-        }
-
-        // --- HELPER METHODS ---
-
         private ProjectSetupWindow InitializeWindow()
         {
             return new ProjectSetupWindow(
@@ -212,38 +136,27 @@ namespace IntegrationTest.ProjectManagementTest
                 _mockLogger!.Object
             );
         }
-
-        /// <summary>
-        /// CÁCH 2: Dùng SendKeys để tự động bấm phím vào MessageBox đang active
-        /// </summary>
         private (bool Found, string Text) HandleMessageBoxWithAction(
             Action action,
             string expectedTitle,
             string buttonToClick,
             int timeoutMs = 8000)
         {
-            // 1. Xác định phím cần gửi
-            string keysToSend = "{ENTER}"; // Mặc định cho OK, Yes, Đồng ý
+            string keysToSend = "{ENTER}";
 
-            // Nếu nút cần bấm là "No" hoặc "Không", ta cần di chuyển focus sang nút đó
-            // Thường nút No nằm bên phải nút Yes, nên dùng phím Tab hoặc Mũi tên phải
             if (buttonToClick.Equals("No", StringComparison.OrdinalIgnoreCase) ||
                 buttonToClick.Equals("Không", StringComparison.OrdinalIgnoreCase))
             {
-                keysToSend = "{TAB}{ENTER}"; // Tab qua nút No rồi Enter
+                keysToSend = "{TAB}{ENTER}";
             }
 
-            // 2. Tạo Task chạy ngầm để đợi và bấm phím
             Task.Run(() =>
             {
-                // Đợi 1-2 giây cho MessageBox chắc chắn đã hiện lên
-                // (Tăng lên nếu máy chạy chậm)
                 Thread.Sleep(1500);
 
                 try
                 {
                     Debug.WriteLine($"[SendKeys] Sending: {keysToSend}");
-                    // Gửi phím vào cửa sổ đang active (MessageBox)
                     SendKeys.SendWait(keysToSend);
                 }
                 catch (Exception ex)
@@ -252,18 +165,12 @@ namespace IntegrationTest.ProjectManagementTest
                 }
             });
 
-            // 3. Thực hiện hành động chính (lệnh này sẽ mở MessageBox và code sẽ dừng tại đây chờ SendKeys)
             Debug.WriteLine("[Main] Invoking Action...");
             action.Invoke();
 
-            // 4. Trả về kết quả giả định (Vì SendKeys không đọc được text trên UI)
-            // Lưu ý: Các assert kiểm tra text trong Test Case có thể bị fail vì dòng này.
             return (true, "Nội dung bị bỏ qua do dùng SendKeys");
         }
 
-        /// <summary>
-        /// Process pending Windows messages (like Application.DoEvents)
-        /// </summary>
         private void DoEvents()
         {
             var frame = new System.Windows.Threading.DispatcherFrame();

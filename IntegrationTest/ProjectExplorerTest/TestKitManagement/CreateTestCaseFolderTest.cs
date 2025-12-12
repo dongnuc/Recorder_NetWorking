@@ -13,7 +13,7 @@ using System.Collections.Generic;
 namespace IntegrationTest.TestKitManagement
 {
     [TestFixture]
-    public class TestCaseFolderIntegrationTests
+    public class CreateTestCaseFolderTest
     {
         private Mock<IOFolderHandler> _mockFolderHandler;
         private Mock<IOFileHandler> _mockFileHandler;
@@ -61,7 +61,7 @@ namespace IntegrationTest.TestKitManagement
         }
 
         [Test]
-        public async Task CreateNewTestCase_WithRequiredConfig_ShouldSucceed()
+        public async Task CreateNewTestCase_WithRequiredConfig()
         {
             // Arrange
             string testCaseName = "ValidTestCase";
@@ -92,7 +92,7 @@ namespace IntegrationTest.TestKitManagement
         }
 
         [Test]
-        public async Task CreateNewTestCase_WithEmptyName_ShouldInvokeServicesButFailGracefully()
+        public async Task CreateNewTestCase_WithEmptyNamez()
         {
             // Arrange
             string emptyName = "";
@@ -108,7 +108,7 @@ namespace IntegrationTest.TestKitManagement
         }
 
         [Test]
-        public async Task CreateNewTestCase_WithExistedName_ShouldFailAndLog()
+        public async Task CreateNewTestCase_WithExistedName()
         {
             // Arrange
             string existingName = "ExistedTestCase";
@@ -126,7 +126,7 @@ namespace IntegrationTest.TestKitManagement
         }
 
         [Test]
-        public async Task CreateNewTestCase_WithoutParentConfig_ShouldDefaultToNoDBAndSucceed()
+        public async Task CreateNewTestCase_WithoutParentConfig()
         {
             // Arrange
             string testCaseName = "NoConfigTestCase";

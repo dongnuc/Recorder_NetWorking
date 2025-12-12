@@ -44,7 +44,6 @@ namespace IntegrationTest.ProjectManagementTest
             _mockServiceProvider = new Mock<IServiceProvider>();
             _mockFolderHandler = new Mock<IOFolderHandler>();
 
-            // Khởi tạo Logger thật
             _realLogger = CreateRealLogManagerInstance();
 
             ResetSettings();
@@ -76,16 +75,13 @@ namespace IntegrationTest.ProjectManagementTest
             );
         }
 
-        // --- CẬP NHẬT: HÀM TÌM VÀ TẠO LOGMANAGER MẠNH MẼ HƠN ---
         private ISystemLogger CreateRealLogManagerInstance()
         {
             Type? logManagerType = null;
 
-            // Cách 1: Tìm trong Assembly của ProjectExplorerWindow (WpfUI)
             logManagerType = typeof(ProjectExplorerWindow).Assembly.GetTypes()
                 .FirstOrDefault(t => t.Name == "LogManager" && !t.IsInterface);
 
-            // Cách 2: Nếu không thấy, QUÉT TẤT CẢ Assembly đang load (bao gồm cả Common, Services...)
             if (logManagerType == null)
             {
                 foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
@@ -95,7 +91,7 @@ namespace IntegrationTest.ProjectManagementTest
                         logManagerType = asm.GetTypes().FirstOrDefault(t => t.Name == "LogManager" && !t.IsInterface);
                         if (logManagerType != null) break;
                     }
-                    catch { /* Bỏ qua lỗi nếu không đọc được Type từ Assembly nào đó */ }
+                    catch { }
                 }
             }
 
@@ -104,31 +100,26 @@ namespace IntegrationTest.ProjectManagementTest
                 throw new Exception("CRITICAL ERROR: Không tìm thấy class 'LogManager' trong bất kỳ DLL nào. Test không thể chạy vì LogViewerControl yêu cầu instance thật.");
             }
 
-            // Thử khởi tạo với các Constructor khác nhau
             var bindingFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
 
-            // Thử 1: Constructor rỗng ()
             try
             {
                 return (ISystemLogger)Activator.CreateInstance(logManagerType, bindingFlags, null, null, null)!;
             }
             catch { }
 
-            // Thử 2: Constructor nhận đường dẫn string (path)
             try
             {
                 return (ISystemLogger)Activator.CreateInstance(logManagerType, bindingFlags, null, new object[] { _testRootPath }, null)!;
             }
             catch { }
 
-            // Thử 3: Constructor nhận IOFolderHandler (Mock)
             try
             {
                 return (ISystemLogger)Activator.CreateInstance(logManagerType, bindingFlags, null, new object[] { _mockFolderHandler!.Object }, null)!;
             }
             catch { }
 
-            // Thử 4: Constructor nhận IServiceProvider (Mock)
             try
             {
                 return (ISystemLogger)Activator.CreateInstance(logManagerType, bindingFlags, null, new object[] { _mockServiceProvider!.Object }, null)!;
@@ -142,22 +133,18 @@ namespace IntegrationTest.ProjectManagementTest
         {
             if (window == null) return;
 
-            // 1. Force UI update lần cuối để đảm bảo mọi thứ đã vẽ xong
             DoEvents();
 
-            // 2. Thực hiện Delay (Vòng lặp nhỏ + DoEvents để UI không bị "đơ" khi chờ)
             if (delayMs > 0)
             {
-                int step = 50; // Mỗi bước chờ 50ms
+                int step = 50;
                 for (int i = 0; i < delayMs; i += step)
                 {
                     Thread.Sleep(step);
-                    DoEvents(); // Quan trọng: Giữ cho cửa sổ phản hồi, không bị quay vòng tròn
+                    DoEvents(); 
                 }
             }
 
-            // 3. Hack: Set biến private _isNavigatingToMainMenu = true
-            // Điều này ngăn chặn Application.Current.Shutdown() được gọi trong OnClosed
             var field = typeof(ProjectExplorerWindow).GetField("_isNavigatingToMainMenu",
                 BindingFlags.NonPublic | BindingFlags.Instance);
 
@@ -166,7 +153,6 @@ namespace IntegrationTest.ProjectManagementTest
                 field.SetValue(window, true);
             }
 
-            // 4. Đóng window
             window.Close();
         }
 

@@ -23,10 +23,8 @@ namespace IntegrationTest.Configuration
         protected Mock<IProcessManager>? _mockProcessManager;
         protected Mock<ITestkitManagerService>? _mockTestkitManager;
 
-        // Giữ lại Mock Logger cho các test cần Verify log
         protected Mock<ISystemLogger>? _mockLogger;
 
-        // Thêm Logger thật để pass qua check của LogViewerControl
         protected ISystemLogger? _realLogger;
 
         [SetUp]
@@ -43,19 +41,15 @@ namespace IntegrationTest.Configuration
             _mockTestkitManager = new Mock<ITestkitManagerService>();
             _mockLogger = new Mock<ISystemLogger>();
 
-            // --- TẠO LOGGER THẬT (Fix lỗi ArgumentException) ---
             _realLogger = CreateRealLogManagerInstance();
 
-            // --- SETUP SERVICE PROVIDER ---
             _mockServiceProvider!.Setup(x => x.GetService(typeof(IProcessManager))).Returns(_mockProcessManager.Object);
             _mockServiceProvider.Setup(x => x.GetService(typeof(ITestkitManagerService))).Returns(_mockTestkitManager.Object);
 
-            // ServiceProvider trả về Logger thật để các thành phần bên trong dùng nó
             _mockServiceProvider.Setup(x => x.GetService(typeof(ISystemLogger))).Returns(_realLogger);
 
             _mockServiceProvider.Setup(x => x.GetService(typeof(IOFileHandler))).Returns(_mockFileHandler!.Object);
 
-            // Mock IServiceScopeFactory
             var mockScopeFactory = new Mock<IServiceScopeFactory>();
             var mockScope = new Mock<IServiceScope>();
             mockScopeFactory.Setup(x => x.CreateScope()).Returns(mockScope.Object);
@@ -73,16 +67,14 @@ namespace IntegrationTest.Configuration
                 _mockFolderHandler!.Object,
                 _mockFileHandler!.Object,
                 _projectPath,
-                _realLogger! // ViewModel cũng dùng Logger thật cho đồng bộ
+                _realLogger! 
             );
         }
 
-        // --- HELPER TẠO REAL LOGGER ---
         private ISystemLogger CreateRealLogManagerInstance()
         {
             try
             {
-                // Tìm class LogManager trong toàn bộ Assembly đang nạp
                 var assemblies = AppDomain.CurrentDomain.GetAssemblies();
                 Type? logType = null;
 
@@ -94,7 +86,6 @@ namespace IntegrationTest.Configuration
 
                 if (logType == null) throw new Exception("Không tìm thấy class LogManager");
 
-                // Thử tạo instance (giả sử constructor nhận path string hoặc không tham số)
                 try
                 {
                     return (ISystemLogger)Activator.CreateInstance(logType,
@@ -114,8 +105,6 @@ namespace IntegrationTest.Configuration
 
         protected MainMenu InitializeMainMenu()
         {
-            // QUAN TRỌNG: Truyền _realLogger vào đây thay vì _mockLogger.Object
-            // Điều này sẽ thỏa mãn điều kiện `if (logger is LogManager)` trong LogViewerControl
             return new MainMenu(
                 _viewModel!,
                 _mockFileHandler!.Object,
@@ -125,7 +114,6 @@ namespace IntegrationTest.Configuration
             );
         }
 
-        // --- CÁC HÀM KHÁC GIỮ NGUYÊN ---
         protected string GetSetting(string key)
         {
             var settingsType = typeof(WpfUI.App).Assembly.GetType("WpfUI.Properties.Settings");

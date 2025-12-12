@@ -10,7 +10,7 @@ namespace IntegrationTest.ProjectManagementTest
     public class OpenExistingProjectTest : ProjectExplorerTestBase
     {
         [Test]
-        public void OpenProject_SelectFromList_ShouldUpdateSettingsAndNavigate()
+        public void OpenProject_SelectFromList()
         {
             string projName = "TargetProject";
             CreateDummyProject(projName);
@@ -29,7 +29,6 @@ namespace IntegrationTest.ProjectManagementTest
                 InvokePrivateMethod(window, "LstRecentProjectsOpen", listBox, null);
                 DoEvents();
 
-                // Assert dùng Helper
                 GetCurrentProjectPathFromSettings().Should().Be(fullPath);
 
                 window.Visibility.Should().Be(System.Windows.Visibility.Hidden);
@@ -40,6 +39,5 @@ namespace IntegrationTest.ProjectManagementTest
             }
         }
 
-        // (Test case còn lại tương tự, chỉ cần chú ý dùng WpfListBox)
     }
 }
