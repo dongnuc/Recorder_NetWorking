@@ -26,13 +26,18 @@ namespace FileManagement.FolderHelper
                 {
                     if (string.IsNullOrWhiteSpace(item)) continue;
 
-                    if (item.Contains("."))
+                    
+                    string extension = Path.GetExtension(item);
+                    bool isNumericExtension = int.TryParse(extension.TrimStart('.'), out _);
+
+                    bool isFile = !string.IsNullOrEmpty(extension) && !isNumericExtension;
+
+                    if (isFile)
                     {
                         string directoryName = Path.GetDirectoryName(item) ?? string.Empty;
                         string fileName = Path.GetFileName(item);
 
                         string fileDirectoryPath = Path.Combine(mainFolderPath, directoryName);
-
                         if (!Directory.Exists(fileDirectoryPath))
                         {
                             Directory.CreateDirectory(fileDirectoryPath);
@@ -45,7 +50,6 @@ namespace FileManagement.FolderHelper
                             if (fileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase))
                             {
                                 ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
-
                                 using (var package = new ExcelPackage())
                                 {
                                     package.Workbook.Worksheets.Add("Test Scenario");
@@ -68,12 +72,11 @@ namespace FileManagement.FolderHelper
                     }
                 }
 
-                return mainFolderPath; 
+                return mainFolderPath;
             }
             catch (Exception ex)
             {
-                throw new Exception($"Lỗi khi tạo thư mục/file tại đường dẫn '{mainFolderPath}'");
-                return string.Empty;
+                throw new Exception($"Error to create folder/file in path '{mainFolderPath}'");
             }
         }
 
@@ -134,8 +137,16 @@ namespace FileManagement.FolderHelper
                 {
                     targetFilePath = Path.Combine(destinationPath, Path.GetFileName(sourcePath));
                 }
+
+                string? targetDirectory = Path.GetDirectoryName(targetFilePath);
+                if (!string.IsNullOrEmpty(targetDirectory) && !Directory.Exists(targetDirectory))
+                {
+                    Directory.CreateDirectory(targetDirectory);
+                }
+
                 File.Copy(sourcePath, targetFilePath, overwrite);
             }
+
             else if (Directory.Exists(sourcePath))
             {
                 if (!Directory.Exists(destinationPath))

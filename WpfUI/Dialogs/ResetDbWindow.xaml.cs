@@ -52,7 +52,7 @@ namespace WpfUI
             if (isSuccess)
             {
                 _logger.LogInfomation($"Executing SQL script: {selectedFilePath}");
-                MessageBox.Show($"Đã reset thành công", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show($"Reset Database SuccessFully", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
                 
                 this.DialogResult = true;
                 this.Close();

@@ -117,7 +117,7 @@ namespace FileManagement.Test
                 _folderHandler.CreateDirectory(_testBasePath, invalidPath);
             });
             // Assert
-            Assert.That(ex.Message, Does.Contain("Lỗi khi tạo thư mục/file"));
+            Assert.That(ex.Message, Does.Contain($"Error to create folder/file in path '{_testBasePath}'"));
         }
 
         [Test]

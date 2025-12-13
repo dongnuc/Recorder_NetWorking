@@ -158,26 +158,51 @@ namespace Common.Helper
             {
                 string exeDirectory = Path.GetDirectoryName(exePath);
 
-                // Construct appsettings. json path
                 string appSettingsPath = Path.Combine(exeDirectory, "appsettings.json");
 
-                // Check if appsettings.json exists
                 if (!File.Exists(appSettingsPath))
                 {
-                    logger.LogWarning($"appsettings. json not found at: {appSettingsPath}");
+                    logger.LogWarning($"appsettings.json not found at: {appSettingsPath}");
                     return null;
                 }
 
                 // Read and parse JSON file
                 string jsonContent = File.ReadAllText(appSettingsPath);
-                var jsonDocument = JsonDocument.Parse(jsonContent);
+
+                using var jsonDocument = JsonDocument.Parse(jsonContent);
 
                 // Try to get Port value from JSON
                 if (jsonDocument.RootElement.TryGetProperty("Port", out JsonElement portElement))
                 {
-                    int port = portElement.GetInt32();
-                    logger.LogInfomation($"Port value read from {appSettingsPath}: {port}");
-                    return port;
+                    int port = 0;
+                    bool isParsed = false;
+
+                    if (portElement.ValueKind == JsonValueKind.Number)
+                    {
+                        if (portElement.TryGetInt32(out port))
+                        {
+                            isParsed = true;
+                        }
+                    }
+                    else if (portElement.ValueKind == JsonValueKind.String)
+                    {
+                        string portStr = portElement.GetString();
+                        if (int.TryParse(portStr, out port))
+                        {
+                            isParsed = true;
+                        }
+                    }
+
+                    if (isParsed)
+                    {
+                        logger.LogInfomation($"Port value read from {appSettingsPath}: {port}");
+                        return port;
+                    }
+                    else
+                    {
+                        logger.LogWarning($"Port property exists but is not a valid integer. Value: {portElement}");
+                        return null;
+                    }
                 }
 
                 logger.LogWarning($"Port property not found in {appSettingsPath}");
