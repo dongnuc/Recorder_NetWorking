@@ -20,6 +20,8 @@ namespace WpfUI
         public string TestCaseName { get; set; } = string.Empty;
         public TabItem TabItem { get; set; }
         public RecorderWindow RecorderWindow { get; set; }
+
+        public IServiceScope? ServiceScope { get; set; }
     }
 
     public partial class MainMenu : Window
@@ -221,20 +223,20 @@ namespace WpfUI
         
         private async Task CreateRecorderTab(string testcasePath, string testcaseName, string clientPath, string serverPath, bool isHttp)
         {
-            RecorderWindowScope scope = null;
+            IServiceScope scope = null;
             try
             {
                 Guid tabId = Guid.NewGuid();
 
-                scope = new RecorderWindowScope(_serviceProvider);
+                scope = _serviceProvider.CreateScope();
                 var processManager = scope.ServiceProvider.GetRequiredService<IProcessManager>();
                 var testkitManagerSerive = scope.ServiceProvider.GetRequiredService<ITestkitManagerService>();
                 var logger = scope.ServiceProvider.GetRequiredService<ISystemLogger>();
-                
+
                 var recorderWindow = new RecorderWindow(testcasePath, testcaseName, clientPath,
                     serverPath, isHttp,
                     processManager, _fileHandler, testkitManagerSerive, logger);
-                    
+
                 bool initSuccess = await recorderWindow.InitializeAsync();
                 if (!initSuccess)
                 {
@@ -262,6 +264,7 @@ namespace WpfUI
                     TestCaseName = testcaseName,
                     TabItem = tabItem,
                     RecorderWindow = recorderWindow,
+                    ServiceScope = scope
                 };
 
                 _activeTabs[tabId] = tabData;
@@ -273,10 +276,16 @@ namespace WpfUI
 
                 TestCaseTabControl.Items.Add(tabItem);
                 TestCaseTabControl.SelectedItem = tabItem;
+
+                scope = null;
             }
             catch (Exception ex)
             {
                 _logger?.LogError($" Error creating tab: {ex.Message}");
+            }
+            finally
+            {
+                scope?.Dispose();
             }
         }
 

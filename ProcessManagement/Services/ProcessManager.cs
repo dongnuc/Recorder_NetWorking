@@ -219,6 +219,8 @@ namespace ProcessManagement.Services
             await _captureLock.WaitAsync();
             try
             {
+                CleanupDeadProcesses();
+                
                 bool hasClient = _processHandles.ContainsKey("Client");
                 bool hasServer = _processHandles.ContainsKey("Server");
 
@@ -503,6 +505,50 @@ namespace ProcessManagement.Services
             }
 
             await Task.CompletedTask;
+        }
+
+
+        private void CleanupDeadProcesses()
+        {
+            var keys = _processHandles.Keys.ToList(); // Lấy danh sách key hiện tại để duyệt
+            foreach (var key in keys)
+            {
+                if (_processHandles.TryGetValue(key, out var handleInfo))
+                {
+                    // Kiểm tra trạng thái Process
+                    bool isDead = false;
+
+                    if (handleInfo.child.hProcess == IntPtr.Zero)
+                    {
+                        isDead = true;
+                    }
+                    else
+                    {
+                        uint waitResult = NativeApi.Kernel32.WaitForSingleObject(handleInfo.child.hProcess, 0);
+                        if (waitResult != 0x00000102) // 0x00000102 là WAIT_TIMEOUT
+                        {
+                            isDead = true;
+                        }
+                    }
+
+                    if (isDead)
+                    {
+                        _logger.LogInfomation($"Detected that process '{key}' has been closed externally. Cleaning up...");
+
+                        _processHandles.TryRemove(key, out _);
+
+                        _previousSnapshots.TryRemove(key, out _);
+
+                        StopInputMonitoring(key);
+
+                        try
+                        {
+                            _mutexManager.Close(handleInfo.mutex);
+                        }
+                        catch { }
+                    }
+                }
+            }
         }
 
         #endregion

@@ -1,7 +1,10 @@
-﻿namespace Common.Helper.Kernel32API
+﻿using System.Runtime.InteropServices;
+
+namespace Common.Helper.Kernel32API
 {
     public interface IConsolePoller
     {
+      
         Task<string> CaptureCurrentConsoleAsync(
            ChildProcess child,
            IntPtr mutex,

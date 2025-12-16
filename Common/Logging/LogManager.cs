@@ -130,7 +130,10 @@ namespace Common.Logging
 
                 WriteToFile(FormatLogLine(logEntry));
                 Debug.WriteLine(FormatLogLine(logEntry));
-                OnLogAdded?.Invoke(logEntry);
+                if (level == LogLevel.Information)
+                {
+                    OnLogAdded?.Invoke(logEntry);
+                }
             }
             catch (Exception ex) { Debug.WriteLine($"[LogManager] Error: {ex.Message}"); }
         }

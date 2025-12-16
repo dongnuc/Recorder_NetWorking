@@ -259,12 +259,9 @@
 
                         <TabItem Header="🏠 Welcome" x:Name="WelcomeTab">
                             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                <TextBlock Text="Chào mừng! Vui lòng chọn một file từ cây bên trái."
+                                <TextBlock Text="Create TestCase To Start Recording"
                                            FontSize="18" HorizontalAlignment="Center"
                                            TextWrapping="Wrap" Foreground="Gray"/>
-                                <TextBlock Text="Hoặc tạo Test Case mới từ menu File."
-                                           FontSize="14" HorizontalAlignment="Center"
-                                           TextWrapping="Wrap" Foreground="DarkGray" Margin="0,10,0,0"/>
                             </StackPanel>
                         </TabItem>
                     </TabControl>

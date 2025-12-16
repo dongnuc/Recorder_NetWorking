@@ -25,6 +25,7 @@ namespace WpfUI.Services
             services.AddSingleton<ISystemLogger, LogManager>();
 
             // ✅ Core Process Management Dependencies (Scoped - same as ProcessManager)
+            services.AddScoped<IProcessManager, ProcessManager>();
             services.AddScoped<IProcessStarter, ProcessStarter>();
             services.AddScoped<IConsolePoller, ConsolePoller>();
             services.AddScoped<IKeyListener, KeyListener>();
@@ -39,7 +40,6 @@ namespace WpfUI.Services
 
             // ✅ Main Services (với đầy đủ DI)
             services.AddScoped<ITestkitManagerService, TestkitManagerService>();
-            services.AddScoped<IProcessManager, ProcessManager>();
 
             // ViewModels - not registered here since they need runtime parameters
 
