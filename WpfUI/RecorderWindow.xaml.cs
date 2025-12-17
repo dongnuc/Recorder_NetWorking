@@ -161,7 +161,7 @@ namespace WpfUI
             // fix port 3000
             if (_actualServerPort == -1)
             {
-                _actualServerPort = 4000;
+                _actualServerPort = 3000;
             }
 
             if (devices.Count == 0)
